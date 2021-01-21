@@ -1,0 +1,38 @@
+[COVARIATE]
+input = race
+
+race = {type=categorical, categories={hispanic, caucasian, asian}}
+
+[INDIVIDUAL]
+input = {ka_pop, omega_ka, Q_pop, omega_Q, V1_pop, omega_V1, V2_pop, omega_V2, Cl_pop, omega_Cl, F_pop, omega_F, race, beta_F_race_caucasian, beta_F_race_asian}
+
+race = {type=categorical, categories={hispanic, caucasian, asian}}
+
+DEFINITION:
+ka = {distribution=logNormal, typical=ka_pop, sd=omega_ka}
+Q = {distribution=logNormal,  typical=Q_pop, sd=omega_Q}
+V1 = {distribution=logNormal, typical=V1_pop, sd=omega_V1}
+V2 = {distribution=logNormal, typical=V2_pop, sd=omega_V2}
+Cl = {distribution=logNormal, typical=Cl_pop, sd=omega_Cl}
+F = {distribution=logNormal,  typical=F_pop, covariate=race, coefficient={0, beta_F_race_caucasian, beta_F_race_asian}, sd=omega_F}
+
+[LONGITUDINAL]
+
+input = {a, b, ka, Cl, V1, Q, V2, F}
+
+EQUATION:
+
+; Parameter transformations 
+V = V1 
+k = Cl/V1 
+k12 = Q/V1 
+k21 = Q/V2
+
+; PK model definition
+Cc = pkmodel(ka, V, k, k12, k21, p=F)
+
+OUTPUT:
+output = Cc
+
+DEFINITION:
+y1 = {distribution=normal, prediction=Cc, errorModel=combined1(a, b)}

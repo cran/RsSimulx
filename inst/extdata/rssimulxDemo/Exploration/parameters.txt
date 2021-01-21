@@ -1,0 +1,2 @@
+ka,Q,V1,V2,Cl,F,treat
+1,1,1,1,1,1,explorationGroup1

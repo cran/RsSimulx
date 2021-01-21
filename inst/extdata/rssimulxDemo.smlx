@@ -1,0 +1,51 @@
+
+<MODEL>
+file = 'rssimulxDemo/ModelFile/model.txt'
+
+<SIMULX>
+
+[SETTINGS]
+GLOBAL:
+exportpath='rssimulxDemo'
+userFilesNextToProject=true
+
+[DEFINITION]
+POPULATION:
+parameters={ka_pop, omega_ka, Q_pop, omega_Q, V1_pop, omega_V1, V2_pop, omega_V2, Cl_pop, omega_Cl, F_pop, omega_F, beta_F_race_caucasian, beta_F_race_asian, a, b}
+'manual_popParam' = {{{values={0.4, 0.6, 0.2, 0.6, 7, 0.03, 2.5, 0.2, 0.2, 0.25, 0.8, 0.1, 0.6, -0.3, 0.005, 0.1}}}}
+
+OUTPUT:
+'regularY1' = {output=y1, {{start=0, interval=12, final=96}}}
+'regularCc' = {output=Cc, {{start=0, interval=1, final=100}}}
+
+INDIVIDUAL:
+parameters={ka, Q, V1, V2, Cl, F}
+'IndivParameters' = {{{values={1, 1, 1, 1, 1, 1}}}}
+
+COVARIATE:
+categoricalCovariates={race}
+'equal_dist' = {{categories={'asian', 'caucasian', 'hispanic'}, probabilities={0.33, 0.33, 0.33}}}
+
+TREATMENT:
+'trt_1' = {{{times={0}, amounts={1}}}, adm=1}
+'trt_5' = {{{times={0}, amounts={5}}}, adm=1}
+'trt_10' = {{{times={0}, amounts={10}}}, adm=1}
+
+[SIMULATION]
+GROUPS:
+'low_dose'={size=200, parameter='manual_popParam', remaining={a=1, b=1}, covariate='equal_dist', outputs={'regularY1', 'regularCc'}, treatment={'trt_1'}}
+'medium_dose'={size=200, parameter='manual_popParam', remaining={a=1, b=1}, covariate='equal_dist', outputs={'regularY1', 'regularCc'}, treatment={'trt_5'}}
+'high_dose'={size=200, parameter='manual_popParam', remaining={a=1, b=1}, covariate='equal_dist', outputs={'regularY1', 'regularCc'}, treatment={'trt_10'}}
+
+[EXPLORATION]
+GROUPS:
+'explorationGroup1'={remaining={a=1, b=1}, parameter='IndivParameters', outputs={'regularCc'}}
+
+[TASKS]
+simulation()
+endpoint(run=false)
+
+[COMMENTS]
+; In this demo we simulate three groups with different dose levels: low, medium and high. Groups have the same number of individuals, population parameters, distribution of covariates and outputs.  Each group appears as a separate subplot in the plots.
+; 
+

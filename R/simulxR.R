@@ -1,27 +1,27 @@
 #' Simulation of mixed effects models and longitudinal data
 #'
 #' Compute predictions and sample data from \code{Mlxtran} and \code{R} models
-#' 
-#' simulx takes advantage of the modularity of hierarchical models for simulating 
-#' different components of a model: models for population parameters, individual 
+#'
+#' simulx takes advantage of the modularity of hierarchical models for simulating
+#' different components of a model: models for population parameters, individual
 #' covariates, individual parameters and longitudinal data.
-#' 
-#' Furthermore, \code{simulx} allows to draw different types of longitudinal data, 
+#'
+#' Furthermore, \code{simulx} allows to draw different types of longitudinal data,
 #' including continuous, count, categorical, and time-to-event data.
-#' 
-#' The models are encoded using either the model coding language \samp{Mlxtran}. 
-#' \samp{Mlxtran} models are automatically converted into C++ codes, 
-#' compiled on the fly and linked to R using the \samp{RJSONIO} package. 
-#' That allows one to implement very easily complex models and to take advantage 
+#'
+#' The models are encoded using either the model coding language \samp{Mlxtran}.
+#' \samp{Mlxtran} models are automatically converted into C++ codes,
+#' compiled on the fly and linked to R using the \samp{RJSONIO} package.
+#' That allows one to implement very easily complex models and to take advantage
 #' of the numerical sovers used by the C++ \samp{mlxLibrary}.
-#' 
-#' See http://simulx.lixoft.com for more details.      
+#'
+#' See http://simulx.lixoft.com for more details.
 #' @param model a \code{Mlxtran} model used for the simulation. It can be a text file or an outut of the inLine function.
 #' You can now create a new simulx project providing a model using `newProject` lixoft simulx connector.
 #' @param parameter a vector of parameters with their names and values
-#' You can now define a new individual element using `defineIndividualElement` lixoft simulx connector and 
+#' You can now define a new individual element using `defineIndividualElement` lixoft simulx connector and
 #' a new population element with 'definePopulationElement' lixoft simulx connector.
-#' @param output a list (or list of lists) with fields: 
+#' @param output a list (or list of lists) with fields:
 #' \itemize{
 #'   \item \code{name}: a vector of output names
 #'   \item \code{time}: a vector of times (only for the longitudinal outputs)
@@ -48,13 +48,13 @@
 #'   \item \code{value} : a vector of values.
 #' }
 #' You can now define a new regressor element using `defineOccasionElement` lixoft simulx connector.
-#' @param varlevel a list (or a dataframe) with fields: 
+#' @param varlevel a list (or a dataframe) with fields:
 #' \itemize{
 #'   \item \code{name} : name of the variable which defines the occasions,
 #'   \item \code{time} : a vector of times (beginnings of occasions)
 #' }
 #' You can now define occasion levels using `defineOccasionElement` lixoft simulx connector.
-#' @param group a list, or a list of lists, with fields: 
+#' @param group a list, or a list of lists, with fields:
 #' \itemize{
 #'   \item \code{size} : size of the group (default=1),
 #'   \item \code{parameter} : if different parameters per group are defined,
@@ -63,9 +63,9 @@
 #'   \item \code{regressor} : if different regression variables per group are defined.
 #' }
 #' "level" field is not supported anymore in RsSimulx.
-#' You can now define a new simulation group using `addGroup` lixoft simulx connector and 
+#' You can now define a new simulation group using `addGroup` lixoft simulx connector and
 #' use connectors `setGroupElement`, `setGroupSize`, to define groups attributes.
-#' @param addlines a list with fields: 
+#' @param addlines a list with fields:
 #' \itemize{
 #'   \item \code{formula}: string, or vector of strings, to be inserted .
 #' }
@@ -75,12 +75,12 @@
 #' @param data a list (output of simulx when settings$data.in==TRUE)
 #' `data` argument is deprecated
 #' @param project the name of a Monolix project
-#' You can now import all elements coming from a Monolix project to perform simulations 
+#' You can now import all elements coming from a Monolix project to perform simulations
 #' using `importMonolixProject` lixoft simulx connector.
 #' @param nrep number of replicates
 #' You can now define the number of replicates if the simulation using `setNbReplicates` lixoft simulx connector.
-#' @param npop number of population parameters to draw randomly 
-#' @param fim a string with the Fisher Information Matrix to be used 
+#' @param npop number of population parameters to draw randomly
+#' @param fim a string with the Fisher Information Matrix to be used
 #' @param result.folder the name of the folder where the outputs of simulx should be stored
 #' `result.folder` argument is deprecated
 #' @param result.file the name of the single file where the outputs of simulx should be saved
@@ -90,22 +90,22 @@
 #' \itemize{
 #'   \item \code{seed} : initialization of the random number generator (integer) (by default a random seed will be generated)
 #'   \item \code{id.out}  : add (TRUE) / remove (FALSE) columns id and group when only one element (N = 1 or group = 1) (default=FALSE)
-#'   \item \code{kw.max} : maximum number of trials for generating a positive definite covariance matrix (default = 100) 
-#'   \item \code{sep} : the field separator character (default = ",") 
-#'   \item \code{digits} : number of decimal digits in output files (default = 5) 
+#'   \item \code{kw.max} : maximum number of trials for generating a positive definite covariance matrix (default = 100)
+#'   \item \code{sep} : the field separator character (default = ",")
+#'   \item \code{digits} : number of decimal digits in output files (default = 5)
 #'   \item \code{replacement} : TRUE/FALSE (default = FALSE) sample id's with/without replacement
 #'   \item \code{out.trt} : TRUE/FALSE (default = TRUE) output of simulx includes treatment
-#' }       
-#' 
+#' }
+#'
 #' @return A list of data frames. Each data frame is an output of simulx
-#' 
+#'
 #' @examples
 #' \dontrun{
 #' myModel <- inlineModel("
 #' [LONGITUDINAL]
 #' input = {A, k, c, a}
 #' EQUATION:
-#' t0    = 0 
+#' t0    = 0
 #' f_0   = A
 #' ddt_f = -k*f/(c+f)
 #' DEFINITION:
@@ -117,29 +117,32 @@
 #' ")
 #' f <- list(name='f', time=seq(0, 30, by=0.1))
 #' y <- list(name='y', time=seq(0, 30, by=2))
-#' res <- simulx(model     = myModel, 
-#'               parameter = c(A=100, k_pop=6, omega=0.3, c=10, a=2), 
+#' res <- simulx(model     = myModel,
+#'               parameter = c(A=100, k_pop=6, omega=0.3, c=10, a=2),
 #'               output    = list(f,y),
 #'               group     = list(size=4))
-#' 
+#'
 #' plot(ggplotmlx() + geom_line(data=res$f, aes(x=time, y=f, colour=id)) +
 #'      geom_point(data=res$y, aes(x=time, y=y, colour=id)))
 #' print(res$parameter)
+#'
 #' }
-#' 
+#'
 #' @importFrom stats runif
 #' @importFrom utils read.table
 #' @export
 
-simulx <- function(model = NULL, parameter = NULL, output = NULL, treatment = NULL, 
-                   regressor = NULL, varlevel = NULL, group = NULL, 
-                   project = NULL, nrep = 1, npop = NULL, fim = NULL, 
+simulx <- function(model = NULL, parameter = NULL, output = NULL, treatment = NULL,
+                   regressor = NULL, varlevel = NULL, group = NULL,
+                   project = NULL, nrep = 1, npop = NULL, fim = NULL,
                    result.folder = NULL, result.file = NULL, stat.f = "statmlx",
                    addlines = NULL, settings = NULL, data = NULL) {
-  
+
   params <- as.list(match.call(expand.dots = TRUE))[-1]
-  
-  initRssimulx(software = "simulx")
+
+  # connectors
+  if (!initRsSimulx()$status)
+    return()
 
   #=============================================================================
   # Raise message for not supported arguments compared to mlxR function
@@ -148,19 +151,19 @@ simulx <- function(model = NULL, parameter = NULL, output = NULL, treatment = NU
   notImplementedSettings <- c("load.design", "data.in", "disp.iter")
   if (any(is.element(notImplementedSettings, names(settings)))) {
     message("[INFO] '", paste(notImplementedSettings, collapse = "', '"),
-            "' information are not anymore supported for `settings` argument. They will be ignored.")
+            "' information are not anymore supported for 'settings' argument. They will be ignored.")
   }
-  
+
   # Message for not implemented data
   if (is.element("data", names(params))) {
     message("[INFO] 'data' argument is not supported by RsSimulx. It will be ignored")
   }
-  
+
   # Message for not implemented stat.f
   if (is.element("stat.f", names(params))) {
     message("[INFO] 'stat.f' argument is not supported by RsSimulx. It will be ignored")
   }
-  
+
   # Message for not implemented result.folder
   if (is.element("result.folder", names(params))) {
     message(
@@ -169,34 +172,50 @@ simulx <- function(model = NULL, parameter = NULL, output = NULL, treatment = NU
       "Check 'result.file' argument if you want to save the result of the simulation"
     )
   }
-  
+
   #=============================================================================
   # Check the inputs of Simulx
   #=============================================================================
+
+  if (!is.null(nrep)) {
+    .check_strict_pos_integer(nrep)
+  }
+  if (!is.null(npop)) {
+    .check_strict_pos_integer(npop)
+    runSimPop <- TRUE
+  } else {
+    runSimPop <- FALSE
+  }
+
   #-----------------------------------------------------------------------------
   # Model file
   nbID <- 1
   if(!is.null(model)){
     .checkModel(fileName = model)
   }
-  set_options(warnings = FALSE)
-  
+  # set_options(warnings = FALSE)
+
   # Settings
   settings <- .initsimulxSettings(settings)
-  
+
   #-----------------------------------------------------------------------------
   # Project file
   if(!is.null(project)){
     .check_file(filename = project, fileType = "Project")
+    if (!.getFileExt(project) == "mlxtran") {
+      stop("Invalid project file. Monolix project must have a .mlxtran extension.", call. = FALSE)
+    }
   }
-  
+
   #-----------------------------------------------------------------------------
   # Project file and model file
-  if(is.null(model) & is.null(project))
+  if(is.null(model) & is.null(project)) {
     stop("You must define either the model or the Monolix project file.", call. = FALSE)
-  if (!is.null(model) & !is.null(project))
+  }
+  if (!is.null(model) & !is.null(project)) {
     stop("You must define either the model or the Monolix project file, not both of them.", call. = FALSE)
-  
+  }
+
   #-----------------------------------------------------------------------------
   # Parameter
   # merge parameters
@@ -205,16 +224,18 @@ simulx <- function(model = NULL, parameter = NULL, output = NULL, treatment = NU
   parameter <- .checkParameter(parameter)
   # Write the data set as a .txt file
   if (is.data.frame(parameter)) {
-    indexID <- which(names(parameter)=='id')
+    indexID <- which(names(parameter) == 'id')
     if (length(indexID) > 0) {
-      nbID <- max(nbID,length(unique(parameter[,indexID[1]])))
+      nbID <- max(nbID, length(unique(parameter[,indexID[1]])))
     }
-    indexPop <- which(names(parameter)=='pop')
+    indexPop <- which(names(parameter) == 'pop')
     if (length(indexPop) > 0) {
-      nbID <- max(nbID,length(unique(parameter[,indexPop[1]])))
+      npop <- length(unique(parameter[,indexPop[1]]))
+      runSimPop <- FALSE
     }
     parameter <- .addDataFrameTemp(df = parameter)
   }
+
   #-----------------------------------------------------------------------------
   # Output
   # check output format
@@ -222,9 +243,6 @@ simulx <- function(model = NULL, parameter = NULL, output = NULL, treatment = NU
   # if dataframe, save it in a txt file
   for (iout in seq_along(output)) {
     outputValue <- output[[iout]]
-    if (is.data.frame(outputValue)) {
-      print("output is dataframe !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
-    }
     if (is.data.frame(outputValue$time)) {
       dfout <- outputValue$time
       # Write the data set as a .txt file
@@ -240,6 +258,7 @@ simulx <- function(model = NULL, parameter = NULL, output = NULL, treatment = NU
   # check treatment format
   treatment <- .checkTreatment(treatment)
   treatment <- .splitTreatment(treatment)
+
   # if dataframe, save it in a txt file
   for (itreat in seq_along(treatment)) {
     treatementValue <- treatment[[itreat]]
@@ -252,7 +271,7 @@ simulx <- function(model = NULL, parameter = NULL, output = NULL, treatment = NU
       treatment[[itreat]] <-.addDataFrameTemp(df = treatementValue)
     }
   }
-  
+
   #-----------------------------------------------------------------------------
   # Regressor
   # check regressor format
@@ -289,7 +308,7 @@ simulx <- function(model = NULL, parameter = NULL, output = NULL, treatment = NU
   #=============================================================================
   if (!is.null(model)) {
     # The simulation is initialized by a model
-    
+
     # Check that the output is not null
     isOutputInGroupHere <- T
     if (is.null(output)) {
@@ -301,38 +320,55 @@ simulx <- function(model = NULL, parameter = NULL, output = NULL, treatment = NU
         }
       }
     }
+
     if (!isOutputInGroupHere) {
-      stop("If only a model is defined, an output element is mandatory to run (either in output or in group definition).", call. = F)
+      stop("If only a model is defined, an output element is mandatory to run ",
+           "(either in output or in group definition).", call. = F)
     } else{
       bIsOutput <- .checkModelOutputSection(model)
+
       if (!bIsOutput) {
         outputName <- .getOutputNames(output, group)
         model <- .addOutputToFile(model, outputName[1])
       }
+
       # The simulation is made through a model file
-      bNewProject <- smlx.newProject(modelFile = model)
-      smlx.setGroupSize(smlx.getGroups()[[1]]$name, nbID)
+      bNewProject <- .lixoftCall("newProject", list(modelFile = model))
     }
   } else {
     # The simulation is initialized by a Monolix project
-    if (!is.null(npop)) {
-      popParam <- simpopmlx(n = npop, project = project, fim = fim, kw.max = settings[["kw.max"]])
-      if (is.element("pop", names(popParam))) popParam <- popParam[names(popParam) != "pop"]
+
+    # population parameters
+    if (runSimPop) {
+      popParam <- simpopmlx(n = npop, project = project, fim = fim,
+                            kw.max = settings[["kw.max"]], seed = settings[["seed"]])
+      if (is.element("pop", names(popParam))) {
+        popParam <- popParam[names(popParam) != "pop"]
+      }
     }
-    bNewProject <- smlx.importMonolixProject(projectFile = project)
-    if (is.element("mlx_PopInit", names(smlx.getPopulationElements()))) {
+
+    # create project
+    bNewProject <- .lixoftCall("importMonolixProject", list(projectFile = project))
+
+    sharedGroupName <- .lixoftCall("getGroups")[[1]]$name
+
+    if (is.element("mlx_PopInit", names(.lixoftCall("getPopulationElements")))) {
       stop("Population parameter estimation has not been launched in monolix project.", call. = FALSE)
     }
-    if (!is.null(npop)) {
-      smlx.definePopulationElement(name = "popSimpopMlx", element = .addDataFrameTemp(df = popParam))
-      smlx.setGroupElement(group=smlx.getGroups()[[1]]$name, elements = "popSimpopMlx")  
+
+    if (runSimPop) {
+      .lixoftCall("definePopulationElement", list(name = "popSimpopMlx", element = .addDataFrameTemp(df = popParam)))
+      .lixoftCall("setGroupElement", list(group=sharedGroupName, elements = "popSimpopMlx"))
     }
-    if (nbID > 1) {
-      smlx.setGroupSize(smlx.getGroups()[[1]]$name, nbID)
-    }
+
   }
-  if (!bNewProject) {return(invisible(FALSE))}
-  
+
+  sharedGroupName <- .lixoftCall("getGroups")[[1]]$name
+
+  if (!bNewProject) {
+    return(invisible(FALSE))
+  }
+
   if (!is.null(npop)) {
     nrep <- npop * nrep
   }
@@ -344,14 +380,19 @@ simulx <- function(model = NULL, parameter = NULL, output = NULL, treatment = NU
       indexID <- which(names(varlevel) == 'id')
       if (length(indexID) > 0) {
         nbID <- max(nbID,length(unique(varlevel[,indexID[1]])))
-        smlx.setGroupSize(smlx.getGroups()[[1]]$name, nbID)
       }
       names(varlevel)[indexID] <- "ID"
       varlevel <-.addDataFrameTemp(df = varlevel)
-      smlx.defineOccasionElement(element = varlevel)
+      .lixoftCall("defineOccasionElement", list(element = varlevel))
     } else {
-      smlx.defineOccasionElement(element = data.frame(time = varlevel$time, occ = 1:length(varlevel$time)))
+      .lixoftCall("defineOccasionElement",
+                  list(element = data.frame(time = varlevel$time, occ = 1:length(varlevel$time))))
     }
+  }
+
+  # set shared group size ------------------------------------------------------
+  if (nbID > 1) {
+    .lixoftCall("setGroupSize", list(group = sharedGroupName, size = nbID))
   }
 
   # Add additional lines in the model ------------------------------------------
@@ -361,14 +402,14 @@ simulx <- function(model = NULL, parameter = NULL, output = NULL, treatment = NU
   if (!is.null(addlines)) {
     for (newline in addlines) {
       if (is.element("section", names(newline))) {
-        if (! grepl("LONGITUDINAL", newline$section)) 
+        if (! grepl("LONGITUDINAL", newline$section))
           stop("'addlines' argument only support 'LONGITUDINAL' section and 'EQUATION' block.", call. = FALSE)
       }
       if (is.element("block", names(newline))) {
         if (grepl("EQUATION", newline))
           stop("'addlines' argument only support 'LONGITUDINAL' section and 'EQUATION' block.", call. = FALSE)
       }
-      smlx.setAddLines(lines = newline$formula)
+      .lixoftCall("setAddLines", list(lines = newline$formula))
     }
   }
   #=============================================================================
@@ -388,47 +429,23 @@ simulx <- function(model = NULL, parameter = NULL, output = NULL, treatment = NU
   }
 
   if (!is.null(parameter)) {
-    
-    if ((parameter[1] == "mode") | (parameter[1] == "mean") | (parameter[1] =="pop")) {
-      if (parameter[1] == "mode") {
-        if (! is.element("mlx_EBEs", names(smlx.getIndividualElements()))) {
-          stop("Invalid parameter mode. EBEs parameters were not found in monolix project.", call. = FALSE)
-        }
-        smlx.setGroupElement(group=smlx.getGroups()[[1]]$name, elements = "mlx_EBEs")
-      } else if(parameter[1] == "mean") {
-        if (! is.element("mlx_CondMean", names(smlx.getIndividualElements()))) {
-          stop("Invalid parameter mean. Conditional mean parameters were not found in monolix project.", call. = FALSE)
-        }
-        smlx.setGroupElement(group=smlx.getGroups()[[1]]$name, elements = "mlx_CondMean")
-      } else {
-        if (! is.element("mlx_CondMean", names(smlx.getIndividualElements()))) {
-          stop("Invalid parameter pop. Individual population parameters were not found in monolix project.", call. = FALSE)
-        }
-        smlx.setGroupElement(group=smlx.getGroups()[[1]]$name, elements = "mlx_PopIndiv")
-      }
-      remaining <- smlx.getGroupRemaining(group = smlx.getGroups()[[1]]$name)
-      popData <- smlx.getPopulationElements()$mlx_Pop$data
-      namesPopData <- names(popData)
-      for (indexParam in seq_along(remaining)) {
-        remainingName <- names(remaining)[indexParam]
-        remaining[indexParam] <- popData[which(namesPopData==remainingName)]
-      }
-      smlx.setGroupRemaining(group = smlx.getGroups()[[1]]$name, remaining)
+    if (parameter[1] %in% c("mode", "mean", "pop")) {
+      .addMlxParameter(parameter)
     } else {
       .addParameter(parameter)
     }
   }
-  
+
   #-----------------------------------------------------------------------------
   # Add treatment
   .addTreatment(treatment)
-  
+
   #-----------------------------------------------------------------------------
   # Add regressor
   .addRegressor(regressor)
-  
+
   groupOut <- NULL
-  
+
   #=============================================================================
   # Design the groups
   #=============================================================================
@@ -438,11 +455,12 @@ simulx <- function(model = NULL, parameter = NULL, output = NULL, treatment = NU
       .addGroup(group[[1]])
     } else if (nbGroup > 1) {
       for (indexGroup in 2:nbGroup) {
-        smlx.addGroup(paste0("simulationGroup",indexGroup))
+        .lixoftCall("addGroup", list(group = paste0("simulationGroup", indexGroup)))
       }
+
       for (indexGroup in seq_len(nbGroup)) {
         .addGroup(group = group[[indexGroup]], groupName = paste0("simulationGroup", indexGroup))
-        groupOut[[indexGroup]] <- list(size = smlx.getGroups()[[indexGroup]]$size, level = 'longitudinal')
+        groupOut[[indexGroup]] <- list(size = .lixoftCall("getGroups")[[indexGroup]]$size, level = 'longitudinal')
       }
     }
   }
@@ -450,38 +468,39 @@ simulx <- function(model = NULL, parameter = NULL, output = NULL, treatment = NU
   # Manage the replicates
   #=============================================================================
   if (nrep > 1) {
-    smlx.setNbReplicates(nrep)
+    .lixoftCall("setNbReplicates", list(nb = nrep))
   }
-  
+
   #=============================================================================
   # Manage the settings
   #=============================================================================
-  smlx.setProjectSettings(seed = settings[['seed']])
+  .lixoftCall("setProjectSettings", list(seed = settings[['seed']]))
   bOutTrt <- settings[['out.trt']]
   if (settings[['replacement']]) {
-    smlx.setSamplingMethod( method = "withReplacement" )
+    .lixoftCall("setSamplingMethod", list(method = "withReplacement"))
   }
-  
-  for (index in seq_along(smlx.getGroups())) {
-    smlx.renameGroup(paste0('simulationGroup', index), paste0(index))
+
+  for (index in seq_along(.lixoftCall("getGroups"))) {
+    .lixoftCall("renameGroup", list(paste0('simulationGroup', index), paste0(index)))
   }
+
   #=============================================================================
   # Run the simulation
   #=============================================================================
-  smlx.runSimulation()
+  .lixoftCall("runSimulation")
 
-  simOut <- smlx.getSimulationResults()$res
-  
+  simOut <- .lixoftCall("getSimulationResults")$res
+
   for (index in seq_along(simOut)) {
     outName <- names(simOut)[index]
     out <- simOut[[index]]
 
     # censor output
     out <- .censorOutput(out, outName, output, group)
-    
+
     # rearrange rep and pop columns
     out <- .rearrangeRepPop(out, npop)
-      
+
     # factor rep id group cens pop & remove unused columns
     out <- .postProcessDataFrames(out, force = settings[["id.out"]])
 
@@ -497,11 +516,10 @@ simulx <- function(model = NULL, parameter = NULL, output = NULL, treatment = NU
   if(!is.null(groupOut)){
     simOut$group <- groupOut
   }
-  
   ##############################################################################
   # Manage parameter output
   ##############################################################################
-  xx <- smlx.getSimulationResults()$IndividualParameters
+  xx <- .lixoftCall("getSimulationResults")$IndividualParameters
   if (length(xx) == 1) {
     paramOut <- xx[[1]]
   } else {
@@ -511,19 +529,19 @@ simulx <- function(model = NULL, parameter = NULL, output = NULL, treatment = NU
     paramOut <- do.call(rbind, xx)
     row.names(paramOut) <- seq_len(nrow(paramOut))
   }
-  
+
   if (ncol(paramOut) > 1) {
     for (indexCol in 2:ncol(paramOut)) {
       notDouble <- suppressWarnings(sum(is.na(as.double(paramOut[,indexCol]) == paramOut[,indexCol])))
       if (notDouble == 0) {
         paramOut[,indexCol] <- as.double(paramOut[,indexCol])
-      }            
+      }
     }
   }
 
   # rearrange rep and pop columns
   paramOut <- .rearrangeRepPop(paramOut, npop)
-  
+
   # factor rep id group cens pop & remove unused columns
   paramOut <- .postProcessDataFrames(paramOut, force = settings[["id.out"]])
 
@@ -534,17 +552,17 @@ simulx <- function(model = NULL, parameter = NULL, output = NULL, treatment = NU
   if (nrow(paramOut) == 1) {
     paramOut <- unlist(paramOut)
   }
-  
+
   simOut$parameter <- paramOut
 
   ##############################################################################
   # Manage treatment output
   ##############################################################################
   if (bOutTrt) {
-    trtFile <- paste0(smlx.getProjectSettings()$directory, '/Simulation/doses.txt')
+    trtFile <- paste0(.lixoftCall("getProjectSettings")$directory, '/Simulation/doses.txt')
     if (file.exists(trtFile)) {
       treat <- read.table(file = trtFile, header = T, sep = .getDelimiter(trtFile))
-      
+
       # rename column amt to amount
       treat <- .renameColumns(treat, "amt", "amount")
 
@@ -555,35 +573,38 @@ simulx <- function(model = NULL, parameter = NULL, output = NULL, treatment = NU
         treat$tinf[!is.na(treat$tinf)] <- treat$amount[!is.na(treat$tinf)] / treat$tinf[!is.na(treat$tinf)]
         treat <- .renameColumns(treat, "tinf", "rate")
       }
-      
+
       # rearrange rep and pop columns
       treat <- .rearrangeRepPop(treat, npop)
-      
+
       # factor rep id group cens pop & remove unused columns
       treat <- .postProcessDataFrames(treat, force = settings[["id.out"]])
-      
+
       simOut$treatment <- treat
     }
   }
-  
+
   ##############################################################################
   # Manage population output
   ##############################################################################
   if (!is.null(nrep)) {
-    popFile <- paste0(smlx.getProjectSettings()$directory,'/Simulation/populationParameters.txt')
+    popFile <- file.path(.lixoftCall("getProjectSettings")$directory,
+                         "Simulation", "populationParameters.txt")
+
     if (file.exists(popFile)) {
       popData <- read.table(file = popFile, header = T, sep = .getDelimiter(popFile))
 
       # rearrange rep and pop columns
       popData <- .rearrangeRepPop(popData, npop)
-      
+
       # factor rep id group cens pop & remove unused columns
       popData <- .postProcessDataFrames(popData, force = settings[["id.out"]])
-      
+
       # if only one set of parameter, return only the first row
       if (nrow(unique(popData[! names(popData) %in% c("rep", "id", "group")])) == 1) {
         popData <- popData[! names(popData) %in% c("rep", "id", "group")][1,]
       }
+
       # if one row: return a named vector
       if (nrow(popData) == 1) {
         popData <- unlist(popData)
@@ -592,14 +613,14 @@ simulx <- function(model = NULL, parameter = NULL, output = NULL, treatment = NU
       simOut$population <- popData
     }
   }
-  
+
   ##############################################################################
   # Write data
   ##############################################################################
   if (!is.null(result.file)) {
     writeData(filename = result.file, sep = settings$sep, nbdigits = settings$digits)
   }
-  
+
   return(simOut)
 }
 
@@ -617,6 +638,7 @@ simulx <- function(model = NULL, parameter = NULL, output = NULL, treatment = NU
 
 .rearrangeRepPop <- function(df, npop) {
   if (! "rep" %in% names(df)) return(df)
+  if (nrow(df) == 0) return(df)
   if (is.null(npop)) npop <- 1
   if (npop == 1) return(df)
   nrep <- length(unique(df$rep)) / npop
@@ -635,7 +657,7 @@ simulx <- function(model = NULL, parameter = NULL, output = NULL, treatment = NU
   for (col in cols) {
     df[[col]] <- as.factor(df[[col]])
   }
-  
+
   if (is.element("rep", names(df))) {
     if (length(unique(df$rep)) == 1) df <- df[names(df) != "rep"]
   }
@@ -643,11 +665,11 @@ simulx <- function(model = NULL, parameter = NULL, output = NULL, treatment = NU
   if (is.element("pop", names(df))) {
     if (length(unique(df$pop)) == 1) df <- df[names(df) != "pop"]
   }
-  
+
   if (is.element("id", names(df))) {
     if (length(unique(df$id)) == 1 & ! force) df <- df[names(df) != "id"]
   }
-  
+
   if (is.element("group", names(df))) {
     if (length(unique(df$group)) == 1 & ! force) df <- df[names(df) != "group"]
   }

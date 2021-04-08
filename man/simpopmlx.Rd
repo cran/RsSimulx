@@ -12,7 +12,8 @@ simpopmlx(
   corr = NULL,
   kw.max = 100,
   outputFilename = NULL,
-  sep = ","
+  sep = ",",
+  seed = NULL
 )
 }
 \arguments{
@@ -41,6 +42,8 @@ It must be a a file with a csv or txt extension.
 If no extension is specified, file will be saved by default in csv format}
 
 \item{sep}{(\emph{string}) file separator when outputFilename is defined (default = ",")}
+
+\item{seed}{(\emph{integer}) initialization of the random number generator (integer) (by default a random seed will be generated)}
 }
 \value{
 dataframe object with generated population parameters

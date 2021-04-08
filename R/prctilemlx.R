@@ -90,6 +90,10 @@ prctilemlx <- function(r = NULL, col=NULL, project = NULL, outputVariableName = 
                         number=8, level=80, plot=TRUE, color=NULL,
                         group=NULL, facet=TRUE, labels=NULL, band=NULL) {
   
+  # connectors
+  if (!initRsSimulx()$status)
+    return()
+
   if (is.null(r) & is.null(project))
     stop("You must define either dataframe 'r' together with argument 'col' or",
          " a  simulx project and the name of the output 'outputVariableName'.", call.=FALSE)
@@ -364,15 +368,20 @@ prctilemlx <- function(r = NULL, col=NULL, project = NULL, outputVariableName = 
 
 .processProject <- function(project, outputVariableName) {
   .loadProject(project, software = "simulx")
+
   # run simulation if needed
-  if (is.null(smlx.getSimulationResults())) smlx.runSimulation()
-  res <- smlx.getSimulationResults()$res
+  if (is.null(.lixoftCall("getSimulationResults"))) {
+    .lixoftCall("runSimulation")
+  }
+
+  res <- .lixoftCall("getSimulationResults")$res
   if (is.null(outputVariableName)) {
     outputVariableName <- names(res)[1]
     message("No output has been specified, 'outputVariableName' set to ", names(res)[1], ".")
   } else if (! is.element(outputVariableName, names(res))) {
     stop("Output '", outputVariableName, "' does not exist.")
   }
+
   result <- res[[outputVariableName]]
   col = c(which(names(result) == "id"), which(names(result) == "time"), which(names(result) == outputVariableName))
   return(list(r = result, col = col))

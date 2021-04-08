@@ -21,6 +21,7 @@
 #' It must be a a file with a csv or txt extension.
 #' If no extension is specified, file will be saved by default in csv format
 #' @param sep (\emph{string}) file separator when outputFilename is defined (default = ",")
+#' @param seed (\emph{integer}) initialization of the random number generator (integer) (by default a random seed will be generated)
 #' @return dataframe object with generated population parameters 
 #' @examples
 #' \dontrun{
@@ -32,36 +33,46 @@
 #' @importFrom stats dnorm qnorm pnorm rnorm
 #' @export
 simpopmlx <- function(n = 1, project = NULL, fim = NULL, parameter = NULL,
-                      corr = NULL, kw.max = 100, outputFilename = NULL, sep = ",") {
-  
+                      corr = NULL, kw.max = 100, outputFilename = NULL, sep = ",", seed = NULL) {
+  # connectors
+  if (!initRsSimulx()$status)
+    return()
+
   # Check arguments ------------------------------------------------------------
   # output filename
   if (!is.null(outputFilename)) {
     ext <- .getFileExt(outputFilename)
     .checkExtension(ext)
     .checkDelimiter(sep, "sep")
-    if (is.null(ext)) outputFilename <- paste0(outputFilename, ".csv")
+    if (is.null(ext)) {
+      outputFilename <- paste0(outputFilename, ".csv")
+    }
   }
   
   # Project file and parameter
-  if(is.null(parameter) & is.null(project))
+  if (is.null(parameter) & is.null(project)) {
     stop("You must define either a set of parameters or a Monolix project file.", call. = FALSE)
-  if (!is.null(parameter) & !is.null(project))
+  }
+  if (!is.null(parameter) & !is.null(project)) {
     stop("You must define either a set of parameters or a Monolix project file, not both of them.", call. = FALSE)
+  }
 
   .check_strict_pos_integer(n, "n")
   .check_strict_pos_integer(kw.max, "kw.max")
+
+  if (!is.null(seed)) {
+    .check_strict_pos_integer(seed, "seed")
+  }
   .check_in_vector(fim, "fim", c("sa", "lin"))
 
   fixedParameter <- NULL
-  if (!is.null(project)){
+  if (!is.null(project)) {
     tryCatch( {
-      inUseSoft <- smlx.getLixoftConnectorsState()$software
       outParamCorr = .getParamCorrProjectFromSimulx(project, fim)
-      initRssimulx(software = inUseSoft, info = FALSE)
+      suppressMessages(initRsSimulx(force=TRUE))
       },
       error = function(e) {
-        initRssimulx(software = inUseSoft, info = FALSE)
+        suppressMessages(initRsSimulx(force=TRUE))
         stop(gsub("Error: ", "", as.character(e)), call. = FALSE)
       }
     )
@@ -95,7 +106,7 @@ simpopmlx <- function(n = 1, project = NULL, fim = NULL, parameter = NULL,
 
   # Generate population parameters ---------------------------------------------
   tryCatch(
-    s.res <- .generatePopParams(mu, sd, trans, bound_min, bound_max, corr, pname, kw.max, n),
+    s.res <- .generatePopParams(mu, sd, trans, bound_min, bound_max, corr, pname, kw.max, n, seed),
     error = function(e) {
       stop("The Fisher Information matrix does not allow to simulate population parameters", call. = FALSE)
     }
@@ -126,9 +137,8 @@ simpopmlx <- function(n = 1, project = NULL, fim = NULL, parameter = NULL,
 
   # save dataframe
   if (!is.null(outputFilename)) {
-    pop <- NULL
     utils::write.table(
-      x = subset(s.res, select = -pop), file = outputFilename,
+      x = s.res[names(s.res) != "pop"], file = outputFilename,
       row.names = FALSE, sep = sep,
       quote = FALSE
     )
@@ -138,33 +148,31 @@ simpopmlx <- function(n = 1, project = NULL, fim = NULL, parameter = NULL,
 }
 
 .getParamCorrProjectFromSimulx = function(projectFile, fim){
-  
-  inUseSoft = smlx.getLixoftConnectorsState()$software
+
   # load monolix project and hide info messages
-  .loadProject(projectFile, software = "monolix", info = FALSE)
-  
+  .loadProject(projectFile, software = "monolix")
+
   # error if population parameter estimation not launched
-  if (mlx.getLaunchedTasks()[["populationParameterEstimation"]] == FALSE) {
+  if (.lixoftCall("getLaunchedTasks")[["populationParameterEstimation"]] == FALSE) {
     stop("Population parameter estimation has not been launched in monolix project.", call. = FALSE)
   }
-  
   #----------------------------------------------------------------------------------------
   # Prepare the population parameters
-  param <- mlx.getPopulationParameterInformation()
-  
+  param <- .lixoftCall("getPopulationParameterInformation")
+
   # remove latent probability parameters
-  covType <- mlx.getCovariateInformation()$type
+  covType <- .lixoftCall("getCovariateInformation")$type
   latentCov <- names(covType)[covType == "latent"]
   pattern <- paste0("^", paste(paste0("p", latentCov), collapse="|"))
   platent <- param$name[grep(pattern, param$name)]
   param <- param[!param$name %in% platent,]
-  
+
   # fixed parameters
   fixedParam <- param[param$method == "FIXED",]
   # remove c error parameters for continuous models
-  if (! is.null(mlx.getContinuousObservationModel())) {
+  if (! is.null(.lixoftCall("getContinuousObservationModel"))) {
     # remove c error parameters in fixedParam
-    errorParams <- unname(do.call(c, mlx.getContinuousObservationModel()$parameters))
+    errorParams <- unname(do.call(c, .lixoftCall("getContinuousObservationModel")$parameters))
     cerror <- errorParams[grep("^c", errorParams)]
     fixedParam <- fixedParam[! fixedParam$name %in% cerror,]
   }
@@ -181,10 +189,12 @@ simpopmlx <- function(n = 1, project = NULL, fim = NULL, parameter = NULL,
 
   param$pop.param <- param$initialValue
   for (index in seq_along(param$pop.param)) {
-    param$pop.param[index] <- mlx.getEstimatedPopulationParameters(param$name[index])
+    param$pop.param[index] <- .lixoftCall("getEstimatedPopulationParameters",
+                                          list(param$name[index]))
   }
+
   # check fim
-  namesFish <- mlx.getLaunchedTasks()[["standardErrorEstimation"]]
+  namesFish <- .lixoftCall("getLaunchedTasks")[["standardErrorEstimation"]]
   if (namesFish == FALSE) {
     stop("Standard errors have not been calculated in monolix project.", call. = FALSE)
   }
@@ -196,17 +206,18 @@ simpopmlx <- function(n = 1, project = NULL, fim = NULL, parameter = NULL,
     }
   }
   if (fim == "lin" & ! "linearization" %in% namesFish) {
-    warning("Invalid fim argument. Linearization method not used in Monolix project. fim set to `sa`.", call. = FALSE)
+    warning("Invalid fim argument. Linearization method not used in Monolix project. fim set to 'sa'.", call. = FALSE)
     fim <- "sa"
   }
   if (fim == "sa" & ! "stochasticApproximation" %in% namesFish) {
-    warning("Invalid fim argument. StochasticApproximation method not used in Monolix project. fim set to `lin`.", call. = FALSE)
+    warning("Invalid fim argument. StochasticApproximation method not used in Monolix project. fim set to 'lin'.", call. = FALSE)
     fim <- "lin"
   }
+
   if (tolower(fim) == "lin") {
-    sd <- mlx.getEstimatedStandardErrors()$linearization
+    sd <- .lixoftCall("getEstimatedStandardErrors")$linearization
   } else {
-    sd <- mlx.getEstimatedStandardErrors()$stochasticApproximation
+    sd <- .lixoftCall("getEstimatedStandardErrors")$stochasticApproximation
   }
 
   # indexNaN <- which(sd == 'NaN')
@@ -230,18 +241,20 @@ simpopmlx <- function(n = 1, project = NULL, fim = NULL, parameter = NULL,
   # Update the distribution
   for (indexParam in seq_along(param$name)) {
     paramName <- param$name[indexParam]
+
     if (nchar(paramName) > 4) {
       endString <- substr(paramName, nchar(paramName)-4+1, nchar(paramName))
+
       if (endString == '_pop') {
         paramName_pop <- substr(paramName, 1, nchar(paramName)-4)
-        distribution <- mlx.getIndividualParameterModel()$distribution[which(paramName_pop==mlx.getIndividualParameterModel()$name)]
+        distribution <- .lixoftCall("getIndividualParameterModel")$distribution[which(paramName_pop == .lixoftCall("getIndividualParameterModel")$name)]
         if (length(distribution) > 0) {
           if (tolower(distribution) == 'normal') {
             param$trans[indexParam] <- 'N';
             # param$bound_min[indexParam] <- -Inf
           } else if (tolower(distribution) == 'logitnormal') {
             param$trans[indexParam] <- 'G'
-            paramLimits <- mlx.getIndividualParameterModel()$limits[[paramName_pop]]
+            paramLimits <- .lixoftCall("getIndividualParameterModel")$limits[[paramName_pop]]
             param$lim.a[indexParam] <- paramLimits[1]
             param$lim.b[indexParam] <- paramLimits[2]
           } else if (tolower(distribution) == 'probitnormal') {
@@ -252,7 +265,6 @@ simpopmlx <- function(n = 1, project = NULL, fim = NULL, parameter = NULL,
         }
       }
     }
-
     if (grepl(x = paramName, pattern = 'beta_')) {
       param$trans[indexParam] <- 'N'
       # param$bound_min[indexParam] <- -Inf
@@ -271,9 +283,11 @@ simpopmlx <- function(n = 1, project = NULL, fim = NULL, parameter = NULL,
   # Prepare the correlation
   # read correlation between parameter estimates
   if (fim == "lin") {
-    corr <- utils::read.csv(file=paste0(smlx.getProjectSettings()$directory,'/FisherInformation/correlationEstimatesLin.txt'), header=F)
+    corr <- utils::read.csv(file=file.path(.lixoftCall("getProjectSettings")$directory,
+                                           "FisherInformation", "correlationEstimatesLin.txt"), header=F)
   } else{
-    corr <- utils::read.csv(file=paste0(smlx.getProjectSettings()$directory,'/FisherInformation/correlationEstimatesSA.txt'), header=F)
+    corr <- utils::read.csv(file=file.path(.lixoftCall("getProjectSettings")$directory,
+                                           "FisherInformation", "correlationEstimatesSA.txt"), header=F)
   }
   # remove latent probability parameters
   if (length(platent)) {
@@ -281,21 +295,22 @@ simpopmlx <- function(n = 1, project = NULL, fim = NULL, parameter = NULL,
     corr <- corr[-idxlatent, - idxlatent]
   }
   corr <- corr[,-1]
-
   #eigenCorr = -min(eigen(corr)$values,0)
 
-  corr <- corr + 1e-4 * diag(x = 1, nrow = nrow(param), ncol = nrow(param))
+  corr <- corr + 1e-4 * diag(x=1, nrow=nrow(param), ncol=nrow(param))
 
-  initRssimulx(software = inUseSoft, info = FALSE)
-
-  return(list(parameter = param, corr = corr, fixedParameter = fixedParam))
+  return(list(parameter=param, corr=corr, fixedParameter=fixedParam))
 }
 
-.generatePopParams <- function(mu, sd, trans, bound_min, bound_max, corr, pname, kw.max = 100, n = 1) {
+.generatePopParams <- function(mu, sd, trans, bound_min, bound_max, corr, pname,
+                               kw.max = 100, n = 1, seed = NULL) {
+  if (!is.null(seed)) {
+    set.seed(seed)
+  }
   np <- length(mu)
 
-  i.omega <- c(grep("^omega_",pname),grep("^omega2_",pname))
-  i.corr <- unique(c(grep("^r_",pname),grep("^corr_",pname)))
+  i.omega <- c(grep("^omega_",pname), grep("^omega2_", pname))
+  i.corr <- unique(c(grep("^r_",pname), grep("^corr_", pname)))
 
   #
   inan <- which(is.nan(as.matrix(corr)), arr.ind=TRUE)
@@ -324,21 +339,28 @@ simpopmlx <- function(n = 1, project = NULL, fim = NULL, parameter = NULL,
   set <- se1
   mut <- mu1
   iL <- which(tr1 == "L")
-  # set[iL] <- se1[iL]/mu1[iL]
-  # mut[iL] <- log(mu1[iL])
+  
+  #  Log normal distribution
   set[iL] <- sqrt(log(1+(se1[iL]/mu1[iL])^2))
   mut[iL] <- log(mu1[iL]) - (set[iL]^2)/2
+  
+  # logit normal distribution
   iG <- which(tr1 == "G")
   set[iG] <- se1[iG] * (bound_max1[iG] - bound_min1[iG]) / ((mu1[iG] - bound_min1[iG]) * (bound_max1[iG] - mu1[iG]))
   mut[iG] <- log((mu1[iG] - bound_min1[iG]) / (bound_max1[iG] - mu1[iG]))
+  
+  # R distribution
   iR <- which(tr1 == "R")
   set[iR] <- se1[iR] * 2 / (1 - mu1[iR]^2)
   mut[iR] <- log((mu1[iR] + 1) / (1 - mu1[iR]))
+  
+  # Probit normal distribution
   iP <- which(tr1 == "P")
   set[iP] <- se1[iP] / dnorm(qnorm(mu1[iP]))
   mut[iP] <- qnorm(mu1[iP])
   Rt <- chol((set%*%t(set)) * corr1)
   #Rt <- chol(corr1)*set
+
   K <- length(i1)
   
   n.corr <- length(i.corr)
@@ -363,11 +385,12 @@ simpopmlx <- function(n = 1, project = NULL, fim = NULL, parameter = NULL,
     n.r <- length(nvar)
     R.r <- diag(rep(1, n.r))
   }
+
   #
   n1 <- n
   s.res <- NULL
   kw <- 0
-  while(n1 > 0){
+  while (n1 > 0) {
     kw <- kw + 1
     if (kw > kw.max)
       stop("Maximum number of iterations reached: could not draw definite positive correlation matrix", call. = F)

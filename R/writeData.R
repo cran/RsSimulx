@@ -35,8 +35,17 @@
 #' } 
 writeData <- function(project = NULL, filename = "simulated_dataset.csv",
                       sep = ",", ext = "csv", nbdigits = 5) {
-  if (is.null(filename)) filename = "simulated_dataset.csv"
-  if (! is.null(.getFileExt(filename))) ext <- .getFileExt(filename)
+  # connectors
+  if (!initRsSimulx()$status) {
+    return()
+  }
+
+  if (is.null(filename)) {
+    filename = "simulated_dataset.csv"
+  }
+  if (! is.null(.getFileExt(filename))) {
+    ext <- .getFileExt(filename)
+  }
 
   .checkDelimiter(sep, "sep")
   .checkExtension(ext, "ext")
@@ -46,28 +55,35 @@ writeData <- function(project = NULL, filename = "simulated_dataset.csv",
   if (!is.null(project)) {
     .loadProject(project, software = "simulx")
   } else if (!.isProjectLoaded()) {
-      stop("No simulx project loaded", call. = FALSE)
+    stop("No simulx project loaded", call. = FALSE)
   }
 
   # run simulation if needed
-  if (is.null(smlx.getSimulationResults())) smlx.runSimulation()
+  if (is.null(.lixoftCall("getSimulationResults"))) {
+    .lixoftCall("runSimulation")
+  }
 
   filename <- paste0(tools::file_path_sans_ext(filename), ".", ext)
 
   # get Simulx data
-  groups <- smlx.getGroups()
+  groups <- .lixoftCall("getGroups")
   treatment <- .getTreatment()
   regressor <- .getRegressor()
-  covariates <- smlx.getCovariateElements()
-  simulation <- smlx.getSimulationResults()
+  covariates <- .lixoftCall("getCovariateElements")
+  simulation <- .lixoftCall("getSimulationResults")
   
-  # Write data for a simulx project with Regressors not implemented
-  version <- smlx.getLixoftConnectorsState()$version
-  if (!is.null(regressor) & (version == "2020R1")) {
-    stop("`writeData` function is not implemented for simulx project with regressors in MonolixSuite version 2020R1", call. = F)
+  # check if results have been well outputted
+  if (is.null(simulation$res)) {
+    stop("No result found for the simulation.", call. = F)
   }
   
-  nbRep <- smlx.getNbReplicates()
+  # Write data for a simulx project with Regressors not implemented
+  version <- .lixoftCall("getLixoftConnectorsState")$version
+  if (!is.null(regressor) & (version == "2020R1")) {
+    stop("'writeData' function is not implemented for simulx project with regressors in MonolixSuite version 2020R1", call. = F)
+  }
+  
+  nbRep <- .lixoftCall("getNbReplicates")
 
   # create a dataset for each replicate
   res <- list()
@@ -79,8 +95,12 @@ writeData <- function(project = NULL, filename = "simulated_dataset.csv",
     } else {
       treatrep <- NULL
       regrep <- NULL
-      if (!is.null(treatment)) treatrep <- subset(treatment, rep == r)
-      if (!is.null(regressor)) regrep <- subset(regressor, rep == r)
+      if (!is.null(treatment)) {
+        treatrep <- subset(treatment, rep == r)
+      }
+      if (!is.null(regressor)) {
+        regrep <- subset(regressor, rep == r)
+      }
       
     }
     rdata <- .compileData(simrep, treatrep, regrep, covariates, groups)
@@ -123,7 +143,10 @@ writeData <- function(project = NULL, filename = "simulated_dataset.csv",
 .compileData <- function(simulation, treatment, regressor, covariates, groups) {
   # Create simulation dataset
   simData <- .convertSimulations(simulation)
-  if (length(groups) == 1) simData$group <- groups[[1]]$name
+  
+  if (length(groups) == 1) {
+    simData$group <- groups[[1]]$name
+  }
 
   # Create covariates dataset
   covData <- .convertCovariates(simulation, covariates, groups)
@@ -168,7 +191,7 @@ writeData <- function(project = NULL, filename = "simulated_dataset.csv",
 
 .getSubjocc <- function() {
   subjocc <- c("id")
-  occ <- smlx.getOccasionElements()$names
+  occ <- .lixoftCall("getOccasionElements")$names
   if (length(occ) > 0) {
     subjocc <- c("id", occ)
   }
@@ -176,7 +199,7 @@ writeData <- function(project = NULL, filename = "simulated_dataset.csv",
 }
 
 .filterReplicate <- function(simulationList, r) {
-  nbRep <- smlx.getNbReplicates()
+  nbRep <- .lixoftCall("getNbReplicates")
   if (nbRep == 1) return(simulationList)
   res <- simulationList
   for (n in names(simulationList)) {
@@ -189,17 +212,20 @@ writeData <- function(project = NULL, filename = "simulated_dataset.csv",
 }
 
 .getObservationNames <- function() {
-  obsnames <- names(smlx.getSimulationResults()$res)
+  obsnames <- names(.lixoftCall("getSimulationResults")$res)
   return(obsnames)
 }
 
 # Create dataset with simulations associated to each group
 .convertSimulations <- function(simulation) { 
+  
   obsnames <- .getObservationNames()
   simData <- simulation$res[[obsnames[1]]]
+  
   if (length(obsnames) > 1) {
     simData$ytype <- 1
     simData <- .renameColumns(simData, obsnames[1], "y")
+  
     for (i in seq(2, length(obsnames))) {
       dataobs <- simulation$res[[obsnames[i]]]
       dataobs$ytype <- i
@@ -207,14 +233,19 @@ writeData <- function(project = NULL, filename = "simulated_dataset.csv",
       simData <- rbind(simData, dataobs)
     }
   }
+  
   return(simData)
+  
 }
 
 # Create dataset with covariates associated to each group
-.convertCovariates <- function(simulation, covariates, groups) { 
+.convertCovariates <- function(simulation, covariates, groups) {
+
   covData <- NULL
   subjocc <- .getSubjocc()
+
   if (!length(covariates)) return(covData)
+
   for (g in seq_along(groups)) {
     gname <- groups[[g]]$name
     gcov <- groups[[g]]$covariate
@@ -235,7 +266,9 @@ writeData <- function(project = NULL, filename = "simulated_dataset.csv",
 
 # Create dataset with treatments associated to each group
 .convertTreatment <- function(treatment) {
+
   if (is.null(treatment)) return(treatment)
+
   if (!all(treatment$washout == FALSE))
     treatment$evid <- sapply(treatment$washout, function(x) ifelse(x, 3, 1))
   # remove unused columns
@@ -250,7 +283,10 @@ writeData <- function(project = NULL, filename = "simulated_dataset.csv",
 
 # Temporary treatment of regressor - when only 1 id in regressor file, spread value of the id to others
 .convertRegressor <- function(regressor, sos) {
-  if (is.null(regressor)) return(regressor)
+
+  if (is.null(regressor))
+    return(regressor)
+  
   if (all(regressor$id == 1)) {
     ntimes <- nrow(regressor)
     regressor <- do.call("rbind", replicate(nrow(sos), regressor, simplify = FALSE))
@@ -260,7 +296,7 @@ writeData <- function(project = NULL, filename = "simulated_dataset.csv",
 }
 
 .getTreatment <- function() {
-  filename <- file.path(smlx.getProjectSettings()$directory, "Simulation", "doses.txt")
+  filename <- file.path(.lixoftCall("getProjectSettings")$directory, "Simulation", "doses.txt")
   if (file.exists(filename)) {
     treatment <- utils::read.csv(filename)
     if (nrow(treatment) == 0) treatment <- NULL
@@ -271,7 +307,7 @@ writeData <- function(project = NULL, filename = "simulated_dataset.csv",
 }
 
 .getRegressor <- function() {
-  filename <- file.path(smlx.getProjectSettings()$directory, "Simulation", "regressors.txt")
+  filename <- file.path(.lixoftCall("getProjectSettings")$directory, "Simulation", "regressors.txt")
   if (file.exists(filename)) {
     regressor <- utils::read.csv(filename)
     if (nrow(regressor) == 0) regressor <- NULL

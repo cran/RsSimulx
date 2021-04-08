@@ -11,7 +11,7 @@
       stop(
         "Invalid model file. Definition of distributions for covariates in the [COVARIATE] block is not supported anymore. \n",
         "Instead, generate the covariates in your R script and pass them as a data.frame to the 'parameter' argument of simulx. \n",
-        "See `http://simulx.lixoft.com/definition/model/` for model definition.",
+        "See 'http://simulx.lixoft.com/definition/model/' for model definition.",
         call. = F
       )
     }
@@ -19,7 +19,7 @@
       stop(
         "Invalid model file. Definition of distributions for covariates in the [COVARIATE] block is not supported anymore. \n",
         "Instead, generate the covariates in your R script and pass them as a data.frame to the 'parameter' argument of simulx. \n",
-        "See `http://simulx.lixoft.com/definition/model/` for model definition.",
+        "See 'http://simulx.lixoft.com/definition/model/' for model definition.",
         call. = F
       )
     }
@@ -32,7 +32,7 @@
       stop(
         "Definition of distributions for population parameters in the [POPULATION] block is not supported anymore. \n",
         "Instead, generate the population parameters in your R script and pass them as a data.frame to the 'parameter' argument of simulx. \n",
-        "See `http://simulx.lixoft.com/definition/model/` for model definition.",
+        "See 'http://simulx.lixoft.com/definition/model/' for model definition.",
         call. = F
       )
     }
@@ -40,7 +40,7 @@
       stop(
         "Definition of distributions for population parameters in the [POPULATION] block is not supported anymore. \n",
         "Instead, generate the population parameters in your R script and pass them as a data.frame to the 'parameter' argument of simulx. \n",
-        "See `http://simulx.lixoft.com/definition/model/` for model definition.",
+        "See 'http://simulx.lixoft.com/definition/model/' for model definition.",
         call. = F
       )
     }
@@ -79,6 +79,11 @@
     if(!(is.vector(parameter)||(is.data.frame(parameter))))
       stop("Invalid paramerer. It must be a vector or a data.frame.", call. = F)
   }
+  # if (is.vector(parameter)) {
+  #   if (! all(sapply(parameter, function(p) length(p) == 1))) {
+  #     stop("Invalid parameter. When parameter is defined as a vector, each defined parameter must be of size 1.", call. = F)
+  #   }
+  # }
   return(parameter)
 }
 
@@ -88,13 +93,13 @@
   if (length(diff)) {
     ismissing <- TRUE
     if (length(diff) == 1) {
-      message <- paste0(" '", diff, "` has not been specified. It ")
+      message <- paste0(" '", diff, "' has not been specified. It ")
     } else {
-      message <- paste0(" '", paste(diff, collapse = "`, `"), "` have not been specified. They ")
+      message <- paste0(" '", paste(diff, collapse = "', '"), "' have not been specified. They ")
     }
     
     if (frommlx) {
-      message <- paste0(message, "will be set to the value estimated by mononlix.")
+      message <- paste0(message, "will be set to the value estimated by Monolix.")
     } else {
       message <- paste0(message, "will be set to 1.")
     }
@@ -109,9 +114,9 @@
   if (length(diff)) {
     isextra <- TRUE
     if (length(diff) == 1) {
-      warning("Found extra parameters. '", diff, "` is not in the model.", call. = F)
+      warning("Found extra parameters. '", diff, "' is not in the model.", call. = F)
     } else {
-      warning("Found extra parameters. '", paste(diff, collapse = "`, `"), "` are not in the model.", call. = F)
+      warning("Found extra parameters. '", paste(diff, collapse = "', '"), "' are not in the model.", call. = F)
     }
   }
   return(isextra)
@@ -128,51 +133,57 @@
 # - all the named used in the inputList are in the mandatoryNames or defaultNames
 ################################################################################
 .checkUnitaryList <- function(inputList, mandatoryNames, defaultNames, listName){
-  if (!is.null(inputList)) {
-    # check that inputList is a list
-    if (!(is.data.frame(inputList) | is.vector(inputList))) {
-      stop("Invalid ", listName, ". It must be a vector with at least the following fields: ", paste(mandatoryNames, collapse = ', '), ".", call. = F)
-    }
+  if (is.null(inputList)) {
+    return(inputList)
+  }
 
-    namesList <- names(inputList)
-    # Check that all the defined elements are vectors
-    for (indexName in seq_along(namesList)) {
-      # if (is.list(inputList[[indexName]]) || ! is.vector(inputList[[indexName]]))
-      #   stop("Invalid field ", namesList[indexName], " in `", listName, "`. It must be a vector.", call. = F)
-      if (! (is.list(inputList[[indexName]]) || is.vector(inputList[[indexName]]) || is.factor(inputList[[indexName]])))
-        stop("Invalid field ", namesList[indexName], " in `", listName, "`. It must be a vector.", call. = F)
-    }
-    if (!is.null(mandatoryNames)) {
-      # Check that all the elements in the mandatory name are defined
-      missingName <- setdiff(mandatoryNames, namesList)
-      if (length(missingName) > 0) {
-        message <- paste0("Mandatory fields are missing in `", listName, "`, ")
-        if (length(missingName) == 1) {
-          message <- paste0(message, "`", missingName,"` is not defined. \n")
-        }else{
-          message <- paste0(message, "(`", paste(missingName, collapse = "`, `"),"`) are not defined. \n")
-        }
-        message <- paste0(message, "Skip '", listName, "`. ")
-        if (grepl("output", listName) & any(missingName %in% c("name", "time"))) {
-          message <- paste0(message, "If it is a parameter, note that simulx function now returns all parameters by default.")
-        }
-        warning(message, call. = F)
-        inputList <- NULL
-      }
-    }
-    # Check that all the elements in the list are either in the mandatory or default list
-    extraName <- setdiff(namesList, union(mandatoryNames,defaultNames))
-    if (length(extraName)>0) {
-      message <- paste0("Invalid fields will be ignored in `", listName, "`.")
-      if(length(extraName)==1){
-        message <- paste0(message, " ", extraName," will be ignored.")
-      }else{
-        message <- paste0(message, " (", paste(extraName, collapse = ','),") will be ignored.")
-      }
-      warning(message, call. = F)
-      inputList <- inputList[! namesList %in% extraName]
+  # check that inputList is a list
+  if (!(is.data.frame(inputList) | is.vector(inputList))) {
+    stop("Invalid ", listName, ". It must be a vector with at least the following fields: ", paste(mandatoryNames, collapse = ', '), ".", call. = F)
+  }
+
+  # Check that all the defined elements are vectors
+  namesList <- names(inputList)
+  for (indexName in seq_along(namesList)) {
+    # if (is.list(inputList[[indexName]]) || ! is.vector(inputList[[indexName]]))
+    #   stop("Invalid field ", namesList[indexName], " in `", listName, "`. It must be a vector.", call. = F)
+    if (! (is.list(inputList[[indexName]]) || is.vector(inputList[[indexName]]) || is.factor(inputList[[indexName]]))) {
+      stop("Invalid field ", namesList[indexName], " in '", listName, "'. It must be a vector.", call. = F)
     }
   }
+
+  if (!is.null(mandatoryNames)) {
+    # Check that all the elements in the mandatory name are defined
+    missingName <- setdiff(mandatoryNames, namesList)
+    if (length(missingName) > 0) {
+      message <- paste0("Mandatory fields are missing in '", listName, "', ")
+      if (length(missingName) == 1) {
+        message <- paste0(message, "'", missingName,"' is not defined. \n")
+      }else{
+        message <- paste0(message, "('", paste(missingName, collapse = "', '"), "') are not defined. \n")
+      }
+      message <- paste0(message, "Skip '", listName, "'. ")
+      if (grepl("output", listName) & any(missingName %in% c("name", "time"))) {
+        message <- paste0(message, "If it is a parameter, note that simulx function now returns all parameters by default.")
+      }
+      warning(message, call. = F)
+      inputList <- NULL
+    }
+  }
+
+  # Check that all the elements in the list are either in the mandatory or default list
+  extraName <- setdiff(namesList, union(mandatoryNames,defaultNames))
+  if (length(extraName) > 0) {
+    message <- paste0("Invalid fields will be ignored in '", listName, "'.")
+    if( length(extraName) == 1){
+      message <- paste0(message, " ", extraName," will be ignored.")
+    }else{
+      message <- paste0(message, " (", paste(extraName, collapse = ','),") will be ignored.")
+    }
+    warning(message, call. = F)
+    inputList <- inputList[! namesList %in% extraName]
+  }
+
   return(inputList)
 }
 
@@ -204,7 +215,7 @@
   
   # error if target in treatment
   if (is.element("target", names(treatment))) {
-    stop("Invalid field `target` for `treatment` argument. You must use `adm=` instead.", call. = FALSE)
+    stop("Invalid field 'target' for 'treatment' argument. You must use 'adm=' instead.", call. = FALSE)
   }
 
   # check names in treatement
@@ -346,7 +357,9 @@
     #   #output$time = 0
     # }
   }
-  if (is.null(output)) output <- as.list(output)
+  if (is.null(output)) {
+    output <- as.list(output)
+  }
   return(output)
 }
 
@@ -394,7 +407,7 @@
 .checkDelimiter <- function(delimiter, argname) {
   if (is.null(delimiter)) return(invisible(TRUE))
   if (! is.element(delimiter, c("\t", " ", ";", ",")))
-    stop("`", argname, "` must be one of: {\"",
+    stop("'", argname, "' must be one of: {\"",
          paste(c("\\t", " ", ";", ","), collapse="\", \""), "\"}.",
          call. = FALSE)
   return(invisible(TRUE))
@@ -407,7 +420,7 @@
 .checkExtension <- function(ext, argname) {
   if (is.null(ext)) return(invisible(TRUE))
   if (! is.element(ext, c("csv", "txt")))
-    stop("`", argname, "` must be one of: {\"",
+    stop("'", argname, "' must be one of: {\"",
          paste(c("csv", "txt"), collapse="\", \""), "\"}.",
          call. = FALSE)
   return(invisible(TRUE))
@@ -567,9 +580,9 @@
   if (is.null(parameter)) return(parameter)
   if (!is.data.frame(parameter)) stop("parameter must be a dataframe object.", call. = FALSE)
   # check parameter values
-  .check_in_vector(names(parameter), "`parameter names`", c("pop.param", "sd", "trans", "lim.a", "lim.b"))
+  .check_in_vector(names(parameter), "'parameter names'", c("pop.param", "sd", "trans", "lim.a", "lim.b"))
   if (! all(is.element(c("pop.param", "sd"), names(parameter))))
-    stop("You must specified at least `pop.param` and `sd` in `parameter` argument")
+    stop("You must specified at least 'pop.param' and 'sd' in 'parameter' argument")
   
   paramName <- row.names(parameter)
 
@@ -580,7 +593,7 @@
     parameter$trans[i.omega] <- "L"
     parameter$trans[i.corr] <- "R"
   }
-  .check_in_vector(parameter$trans, "`parameter trans`", c("N", "L", "G", "P", "R"))
+  .check_in_vector(parameter$trans, "'parameter trans'", c("N", "L", "G", "P", "R"))
   
   # lim.a & lim.b
   if (is.null(parameter$lim.a)) {
@@ -634,7 +647,7 @@
   # if (!is.matrix(corr) | !is.data.frame(corr))
   #   stop("`corr` must be a matrix or a dataframe of shape (", nbParams, " x ", nbParams, ").", call. = FALSE)
   if (nrow(corr) != nbParams | ncol(corr) != nbParams)
-    stop("`corr` must be a matrix of shape (", nbParams, " x ", nbParams, ").", call. = FALSE)
+    stop("'corr' must be a matrix of shape (", nbParams, " x ", nbParams, ").", call. = FALSE)
   # corr elements must be in [-1, 1]
   .check_in_range(corr[! is.na(corr)], "corr elements", lowerbound = -1 - 1e-4, upperbound = 1 + 1e-4, includeBound = TRUE)
   return(corr)
@@ -754,7 +767,7 @@
 .check_in_vector <- function(arg, argname, vector) {
   if (is.null(arg)) return(invisible(TRUE))
   if (! all(is.element(arg, vector))) {
-    stop(argname, " must be in {`", paste(vector, collapse="`, `"), "`}.", call. = F)
+    stop(argname, " must be in {'", paste(vector, collapse="', '"), "'}.", call. = F)
   }
   return(invisible(TRUE))
 }
@@ -771,4 +784,17 @@
     }
   }
   return(invisible(TRUE))
+}
+
+# return TRUE if an object is a string
+is.string <- function(str) {
+  isStr <- TRUE
+  if (!is.null(names(str))) {
+    isStr <- FALSE
+  } else if (length(str) > 1) {
+    isStr <- FALSE
+  } else if (! is.character(str)) {
+    isStr <- FALSE
+  }
+  return(isStr)
 }

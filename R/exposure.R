@@ -80,10 +80,9 @@ exposure <- function (model = NULL, output = NULL, group = NULL, treatment = NUL
     message("[INFO] 'data' argument is not supported by RsSimulx. It will be ignored")
   }
 
-  if (!is.null(group)) {
-    if (!is.null(group$output)) 
-      stop("\n'output' cannot be defined in 'group' with exposure\n", 
-           call. = FALSE)
+  if (!is.null(group$output)) {
+    stop("\n'output' cannot be defined in 'group' with exposure\n", 
+         call. = FALSE)
   }
   if (identical(output$time, "steady.state")) {
     if (is.null(output$ntp)) {
@@ -104,10 +103,12 @@ exposure <- function (model = NULL, output = NULL, group = NULL, treatment = NUL
     else {
       tol <- output$tol
     }
-    if (is.null(group)) 
+    if (is.null(group)) {
       group <- list(NULL)
-    if (!is.null(names(group))) 
+    }
+    if (!is.null(names(group))) { 
       group <- list(group)
+    }
     G <- length(group)
     if (!is.null(treatment)) {
       for (g in (1:G)) group[[g]]$treatment <- treatment

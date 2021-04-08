@@ -1,7 +1,7 @@
 Package: RsSimulx
 Type: Package
 Title: R Speaks 'Simulx'
-Version: 1.0.0
+Version: 1.0.1
 Authors@R: 
     c(person(given = "Clemence",
              family = "Pinaud",
@@ -22,18 +22,18 @@ Depends: R (>= 3.0.0), ggplot2
 Imports: gridExtra, utils, stats, grDevices
 Encoding: UTF-8
 Collate: catplotmlx.R ggplotmlx.R kmplotmlx.R prctilemlx.R simulxR.R
-        smlx-checks.R smlx-init.R smlx-tools.R data.R smlx-connectors.R
-        writeData.R zzz.R exposure.R shinymlx.R statmlx.R stoolsmlx.R
-        simpop.R utils.R
+        writeData.R exposure.R shinymlx.R statmlx.R stoolsmlx.R
+        simpop.R smlx-checks.R smlx-tools.R smlx-data.R smlx-project.R
+        apiTools.R apiManager.R utils.R data.R zzz.R
 LazyData: true
 License: BSD_2_clause + file LICENSE
 Copyright: LIXOFT
 RoxygenNote: 7.1.1.9000
 Suggests: testthat
 NeedsCompilation: no
-Packaged: 2021-01-19 10:26:39 UTC; clemence
+Packaged: 2021-04-08 12:59:58 UTC; clemence
 Author: Clemence Pinaud [aut, cre],
   Jonathan Chauvin [aut],
   Marc Lavielle [ctb]
 Repository: CRAN
-Date/Publication: 2021-01-21 11:10:06 UTC
+Date/Publication: 2021-04-08 13:20:02 UTC

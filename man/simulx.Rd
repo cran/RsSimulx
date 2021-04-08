@@ -170,6 +170,7 @@ res <- simulx(model     = myModel,
 plot(ggplotmlx() + geom_line(data=res$f, aes(x=time, y=f, colour=id)) +
      geom_point(data=res$y, aes(x=time, y=y, colour=id)))
 print(res$parameter)
+
 }
 
 }

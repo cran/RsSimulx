@@ -3,7 +3,7 @@
 export(catplotmlx)
 export(exposure)
 export(ggplotmlx)
-export(initRssimulx)
+export(initRsSimulx)
 export(inlineDataFrame)
 export(inlineModel)
 export(kmplotmlx)

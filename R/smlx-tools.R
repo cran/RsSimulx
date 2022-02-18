@@ -92,6 +92,24 @@ inlineDataFrame <- function(str){
   return(df)
 }
 
+
+# get model file from model library
+.getModelFile <- function(model) {
+  if (!grepl( "^lib:", model)) return(model)
+  lixoftPath <- .lixoftCall("getLixoftConnectorsState", list(quietly = TRUE))$path
+  libPath <- file.path(lixoftPath, "factory", "library")
+  models <- list.files(
+    path = libPath,
+    pattern = paste0("*", gsub("^lib:", "", model)),
+    recursive = TRUE
+  )
+  if (length(models) == 0) {
+    stop("Invalid model ", model, ". It is not in the model library.", call. = FALSE)
+  }
+  model <- file.path(libPath, models[1])
+  return(model)
+}
+
 #*******************************************************************************
 # OUTPUT MANAGEMENT
 #*******************************************************************************
@@ -111,58 +129,70 @@ inlineDataFrame <- function(str){
 .addUnitaryOutput <- function(output, groupName = NULL){
   outputVect <- output
   outName_full <- NULL
-
   tt <-  outputVect$time
-
-  if (length(.lixoftCall("getOccasionElements")$occasions) > 1) {
-    occLevel <- .lixoftCall("getOccasionElements")$occasions
-    occLevelName <- .lixoftCall("getOccasionElements")$name
-    occLevelTime <- .lixoftCall("getOccasionElements")$time
-    occLevelId <- .lixoftCall("getOccasionElements")$id
-
+  
+  occInfo <- .lixoftCall("getOccasionElements")
+  if (length(occInfo$occasions) > 1) {
+    occLevel <- occInfo$occasions
+    occLevelName <- occInfo$name
+    occLevelTime <- occInfo$time
+    occLevelId <- occInfo$id
+    
+    # output defined as string
     if (is.string(tt)) {
       df_occ <- utils::read.table(file = tt, header = T, sep = .getDelimiter(tt))
-      df_occ$occ <- 1
-      idName <- names(df_occ)[names(df_occ) == 'id']
-      if (is.null(occLevelId)) {
-        occLevelTime <- c(occLevelTime, max(df_occ$time) + 1)
-        for (idx in seq_along(occLevel)) {
-          df_occ[(df_occ$time >= occLevelTime[idx]) & (df_occ$time < occLevelTime[idx + 1]),] <- occLevelName
-        }
-      } else {
-        for (id in unique(occLevelId)) {
-          occTimeId <- unique(c(occLevelTime[occLevelId == id], max(df_occ$time[df_occ[[idName]] == id]) + 1))
-          occId <- occLevel[occLevelId == id]
-          for (idx in seq_along(occId)) {
-            df_occ[(df_occ$id == id) & (df_occ$time >= occLevelTime[idx]) & (df_occ$time < occLevelTime[idx + 1]),] <- occLevelName
-          }
-        }
-      }
+      df_occ$time <- as.numeric(df_occ$time)
     } else {
-      df_occ <- NULL
-      if (is.null(occLevelId)) {
-        occLevelTime <- c(occLevelTime, max(tt) + 1)
-        for (idx in seq_along(occLevel)) {
-          occlist <- occLevel[[idx]]
-          names(occlist) <- occLevelName
-          df <- cbind(as.list(occlist), data.frame(time = tt[tt >= occLevelTime[idx] & tt < occLevelTime[idx + 1]]))
-          df_occ <- rbind(df_occ, df)
-        }
+      if (! is.null(occLevelId)) {
+        ids <- unique(occLevelId)
+        df_occ <- data.frame(id=rep(ids, each=length(tt)),
+                             time=rep(tt, length(ids)))
       } else {
+        df_occ <- data.frame(time=tt)
+      }
+    }
+
+    matchOccNames <- unlist(sapply(occLevelName, function(name) grep(paste0("^", name, "$"), names(df_occ), ignore.case=T, value=T)))
+    df_occ <- .renameColumns(df_occ, unname(matchOccNames), names(matchOccNames))
+    
+    # check treatment elements
+    extraNames <- setdiff(names(df_occ),
+                          c(occLevelName, "id", "time", "lloq", "uloq", "limit"))
+    if (length(extraNames)) {
+      warning("Invalid occasions found in output: '", paste0(extraNames, collapse="', '"),
+              "' will be removed. Available occasions are '",
+              paste(occLevelName, collapse="', '"), "'.", call.=F)
+      df_occ <- df_occ[! names(df_occ) %in% extraNames]
+    }
+
+    for (o in seq_along(occLevelName)) {
+      occname <- occLevelName[o]
+      if (occname %in% names(df_occ)) next
+      if (occname %in% .getOverlapOccasion()) next
+
+      occasions <- sapply(occLevel, function(occ) occ[[o]])
+
+      # levels same for all ids
+      if (is.null(occLevelId)) {
+        df_occ <- .fill_occasion(df_occ, occasions, occLevelTime, occname)
+      } else {
+        df = df_occ
         for (id in unique(occLevelId)) {
-          occTimeId <- c(occLevelTime[occLevelId == id], max(tt) + 1)
-          occId <- occLevel[occLevelId == id]
-          for (idx in seq_along(occId)) {
-            occlist <- occId[[idx]]
-            names(occlist) <- occLevelName
-            occlist <- c(id = id, occlist)
-            df <- cbind(as.list(occlist), data.frame(time = tt[tt >= occTimeId[idx] & tt < occTimeId[idx + 1]]))
-            df_occ <- rbind(df_occ, df)
-          }
+          if (! id %in% df$id) next
+          df_occ_id <- .fill_occasion(df[df$id == id,],
+                                      occasions[occLevelId == id],
+                                      occLevelTime[occLevelId == id],
+                                      occname)
+          df_occ[df_occ$id == id, occname] <- df_occ_id[[occname]]
         }
       }
     }
-    data <- .addDataFrameTemp(df_occ)
+    df_occ <- df_occ[intersect(c("id", occLevelName, "time"), names(df_occ))]
+    if ("id" %in% names(df_occ)) {
+      data <- .addDataFrameTemp(df_occ)
+    } else {
+      data <- df_occ
+    }
   } else {
     if (is.string(outputVect$time)) {
       data <- outputVect$time
@@ -180,9 +210,9 @@ inlineDataFrame <- function(str){
       messageMatch <- NULL
     }
     .lixoftCall("defineOutputElement",
-                list(name = outName, element = list(data = data, output = outputVect$name[indexName])),
-                messageMatch = messageMatch)
-    outName_full <- c(outName_full, outName)
+                  list(name = outName, element = list(data = data, output = outputVect$name[indexName])),
+                  messageMatch = messageMatch)
+      outName_full <- c(outName_full, outName)
   }
   return(outName_full)
 }
@@ -192,6 +222,8 @@ inlineDataFrame <- function(str){
 # If groupName is NULL, it will be added to the shared group
 ################################################################################
 .addOutput <- function(output, groupName = NULL){
+  if (is.null(output)) return(invisible(TRUE))
+
   sharedGroupName <- .lixoftCall("getGroups")[[1]]$name
   if(is.null(groupName)) {
     groupName <- sharedGroupName
@@ -199,32 +231,21 @@ inlineDataFrame <- function(str){
 
   outName_full <- NULL
 
-  # in case of mlx project, add mlx outputs to shared group
-  mlxOutputsId <- grep("mlx_", .lixoftCall("getGroups")[[1]]$output)
-  if (groupName == sharedGroupName & length(mlxOutputsId)) {
-    mlxOutputs <- .lixoftCall("getGroups")[[1]]$output[mlxOutputsId]
-    mlxOutputsNames <- unname(sapply(.lixoftCall("getOutputElements")[mlxOutputs], function(o) o$output))
-    outNames <- unname(sapply(output, function(o) o$name))
-    mlxOutputs <- mlxOutputs[! mlxOutputsNames %in% outNames]
-    if (length(mlxOutputs)) {
-      # do not include outputs for which time is set to none
-      isRemoved <- sapply(output, function(o) all(o$time == "none"))
-      if (any(TRUE %in% isRemoved)) {
-        outputToRemove <- do.call(c, lapply(output[isRemoved], function(o) o$name))
-        mlxOutputs <- mlxOutputs[! mlxOutputs %in% paste0("mlx_", outputToRemove)]
+  for (iout in seq_along(output)) {
+    outValue <- output[[iout]]
+    
+    if (is.string(outValue)) {
+      if (! outValue %in% .getMlxOutputNames()) {
+        stop("Invalid output '", outValue, "' not found in Monolix project. ",
+             "Available monolix outputs are ", paste(.getMlxOutputNames(), collapse=", "),
+             ".", call.=F)
       }
-      outName_full <- mlxOutputs
-    }
-  }
+      
+      outName_full <- c(outName_full, outValue)
 
-  if (!is.null(output)) {
-    output <- output[sapply(output, function(o) all(o$time != "none"))]
-    for (iout in seq_len(length(output))) {
-      outValue <- output[[iout]]
-      if (is.element("time", names(outValue))) {
-        outName <- .addUnitaryOutput(output = outValue, groupName)
-        outName_full <- c(outName_full, outName)
-      }
+    } else if (is.element("time", names(outValue))) {
+      outName <- .addUnitaryOutput(output = outValue, groupName)
+      outName_full <- c(outName_full, outName)
     }
   }
 
@@ -260,73 +281,107 @@ inlineDataFrame <- function(str){
     return(NULL)
   }
 
-  df_treatment <- data.frame(time = treatment$time, amount = treatment$amount)
-
-  # Add Tinf if present
-  if ("tinf" %in% names(treatment)) {
-    df_treatment$tInf <- treatment$tinf
+  if (is.string(treatment)) {
+    treatment <- utils::read.table(file = treatment, header = T, sep = .getDelimiter(treatment))
+    admID <- unique(treatment$type)
+    probaMissDose <- unique(treatment$probaMissDose)
+    repeats <- NULL
+    df_treatment <- treatment[! names(treatment) %in% c("type", "probaMissDose")]
+  } else {
+    admID <- treatment$type
+    probaMissDose <- treatment$probaMissDose
+    repeats <- treatment$repeats
+    df_treatment <- data.frame(time = treatment$time, amount = treatment$amount)
+    
+    # Add Tinf if present
+    if ("tinf" %in% names(treatment)) {
+      df_treatment$tInf <- treatment$tinf
+    }
+    
+    if ("rate" %in% names(treatment)) {
+      df_treatment$tInf <- df_treatment$amount/treatment$rate
+    }
+    
+    if ("washout" %in% names(treatment)) {
+      df_treatment$washout <- treatment$washout
+    }
   }
 
-  if ("rate" %in% names(treatment)) {
-    df_treatment$tInf <- df_treatment$amount/treatment$rate
-  }
+  occInfo <- .lixoftCall("getOccasionElements")
 
-  # Same with reset
-  trtName <- .addUnitaryTrtName(treatment = treatment, groupName = groupName)
-  if (length(.lixoftCall("getOccasionElements")$occasions) > 0) {
-    occLevel <- .lixoftCall("getOccasionElements")$occasions
-    occLevelName <- .lixoftCall("getOccasionElements")$name
-    occLevelTime <- .lixoftCall("getOccasionElements")$time
-    occLevelId <- .lixoftCall("getOccasionElements")$id
+  if (length(occInfo$occasions) > 1) {
+    occLevel <- occInfo$occasions
+    occLevelName <- occInfo$name
+    occLevelTime <- occInfo$time
+    occLevelId <- occInfo$id
+    
+    df_treatment$time <- as.numeric(df_treatment$time)
+    matchOccNames <- unlist(sapply(occLevelName, function(name) grep(paste0("^", name, "$"), names(df_treatment), ignore.case=T, value=T)))
+    df_treatment <- .renameColumns(df_treatment, unname(matchOccNames), names(matchOccNames))
 
-    tt <- df_treatment$time
-    df_occ <- NULL
+    # check treatment elements
+    extraNames <- setdiff(names(df_treatment),
+                          c(occLevelName, "id", "time", "amount", "tinf", "rate", "washout"))
+    if (length(extraNames)) {
+      warning("Invalid occasions found in treatement: '", paste0(extraNames, collapse="', '"),
+              "' will be removed. Available occasions are '",
+              paste(occLevelName, collapse="', '"), "'.", call.=F)
+      df_treatment <- df_treatment[! names(df_treatment) %in% extraNames]
+    }
 
-    if (is.null(occLevelId)) {
-      occLevelTime <- c(occLevelTime, max(tt) + 1)
-
-      for (idx in seq_along(occLevel)) {
-        occlist <- occLevel[[idx]]
-        names(occlist) <- occLevelName
-        df_trt <- df_treatment[tt >= occLevelTime[idx] & tt < occLevelTime[idx + 1],]
-        if (nrow(df_trt) > 0) {
-          df <- cbind(as.list(occlist), df_trt)
-          df_occ <- rbind(df_occ, df)
-        }
-      }
+    if (! is.null(occLevelId) & ! "id" %in% names(df_treatment)) {
+      ids <- unique(occLevelId)
+      df_occ <- do.call("rbind", replicate(length(ids), df_treatment, simplify = FALSE))
+      df_occ$id <- rep(ids, each=nrow(df_treatment))
     } else {
-
-      for (id in unique(occLevelId)) {
-        occTimeId <- c(occLevelTime[occLevelId == id], max(tt) + 1)
-        occId <- occLevel[occLevelId == id]
-
-        for (idx in seq_along(occId)) {
-          occlist <- occId[[idx]]
-          names(occlist) <- occLevelName
-          occlist <- c(ID = id, occlist)
-          df_trt <- df_treatment[tt >= occTimeId[idx] & tt < occTimeId[idx + 1],]
-          if (nrow(df_trt) > 0) {
-            df <- cbind(as.list(occlist), df_trt)
-            df_occ <- rbind(df_occ, df)
-          }
+      df_occ <- df_treatment
+    }
+    for (o in seq_along(occLevelName)) {
+      occname <- occLevelName[o]
+      if (occname %in% names(df_occ)) next
+      if (occname %in% .getOverlapOccasion()) next
+      
+      occasions <- sapply(occLevel, function(occ) occ[[o]])
+      
+      # levels same for all ids
+      if (is.null(occLevelId)) {
+        df_occ <- .fill_occasion(df_occ, occasions, occLevelTime, occname)
+      } else {
+        df <- df_occ
+        for (id in unique(occLevelId)) {
+          if (! id %in% df$id) next
+          df_occ_id <- .fill_occasion(df[df$id == id,],
+                                      occasions[occLevelId == id],
+                                      occLevelTime[occLevelId == id],
+                                      occname)
+          df_occ[df_occ$id == id, occname] <- df_occ_id[[occname]]
         }
       }
     }
-
-    admID <- treatment$type
-    treat <- .addDataFrameTemp(df = df_occ[names(df_occ) != "type"])
-    messageMatch = "treatment data"
-    names(messageMatch) <- paste0("'", treat, "'")
-    .lixoftCall("defineTreatmentElement",
-                list(name = trtName, element = list(admID = admID, data = treat)),
-                messageMatch = messageMatch)
-
-  } else {
-    admID <- treatment$type
-    .lixoftCall("defineTreatmentElement",
-                list(name = trtName, element = list(admID = admID, data = df_treatment)))
+    df_occ <- df_occ[intersect(c("id", occLevelName, setdiff(names(df_treatment), "id")), names(df_occ))]
+    df_treatment <- df_occ
   }
 
+  if ("id" %in% names(df_treatment)) {
+    data <- .addDataFrameTemp(df_treatment)
+  } else {
+    data <- df_treatment
+  }
+
+  trtName <- .addUnitaryTrtName(treatment = treatment, groupName = groupName)
+
+  if (is.string(data)) {
+    messageMatch <- "treatment data"
+    names(messageMatch) <- paste0("'", data, "'")
+  } else {
+    messageMatch <- NULL
+  }
+  .lixoftCall("defineTreatmentElement",
+              list(name = trtName, element = list(admID=admID,
+                                                  probaMissDose=probaMissDose,
+                                                  repeats=repeats,
+                                                  data=data)),
+              messageMatch = messageMatch)
   return(trtName)
 }
 
@@ -350,18 +405,13 @@ inlineDataFrame <- function(str){
 
     treat <- treatment[[indexTreatment]]
 
-    if (is.string(treat)) {
-      trtName <- .addUnitaryTrtName(treat, groupName)
-      trt <- utils::read.table(file = treat, header = T, sep = .getDelimiter(treat))
-      admID <- unique(trt$type)
-      treat <- .addDataFrameTemp(trt[names(trt) != "type"])
-      messageMatch = "treatment data"
-      names(messageMatch) <- paste0("'", treat, "'")
-      .lixoftCall("defineTreatmentElement", list(name = trtName,
-                                                 element = list(admID = admID, data = treat)),
-                  messageMatch = messageMatch)
-      trtName_full <- c(trtName_full, trtName)
-
+    if (is.string(treat) && ! file.exists(treat)) {
+      if (! treat %in% .getMlxTreatmentNames()) {
+        stop("Invalid treatment. '", treat, "' not found in Monolix project. ",
+             "Available monolix treatments are ", paste(.getMlxTreatmentNames(), collapse=", "),
+             ".", call.=F)
+      }
+      trtName_full <- c(trtName_full, treat)
     } else {
       trtName <- .addUnitaryTrt(treatment = treat, groupName = groupName)
       trtName_full <- c(trtName_full, trtName)
@@ -371,6 +421,23 @@ inlineDataFrame <- function(str){
   .lixoftCall("setGroupElement", list(group = groupName, elements = trtName_full))
 
   return(invisible(TRUE))
+}
+
+.getMlxTreatmentNames <- function() {
+  treat <- names(.lixoftCall("getTreatmentElements"))
+  if (!is.null(treat)) {
+    treatNames <- treat[startsWith(treat, "mlx_Adm")]
+  } else {
+    treatNames <- c()
+  }
+  return(treatNames)
+}
+
+.getMlxOutputNames <- function() {
+  output <- names(.lixoftCall("getOutputElements"))
+  
+  outputNames <- output[startsWith(output, "mlx_")]
+  return(outputNames)
 }
 
 #*******************************************************************************
@@ -442,32 +509,31 @@ inlineDataFrame <- function(str){
 
 ################################################################################
 # .addParameter adds a parameter vector to the group groupName
-# It is split between individual and covariate
+# It is split between individual and population
 # If groupName is NULL, it will be added to the shared group
 ################################################################################
 .addParameter <- function(parameter, groupName = NULL){
   if(is.null(parameter)) {
     return(invisible(TRUE))
   }
-
-  covElements <- .lixoftCall("getCovariateElements")
   popElements <- .lixoftCall("getPopulationElements")
   indivElements <- .lixoftCall("getIndividualElements")
-
-  outName <- NULL
 
   # paramtype: individual or population
   if (is.null(groupName)) {
     g <- .lixoftCall("getGroups")[[1]]
+    groupName <- .lixoftCall("getGroups")[[1]]$name
   } else {
     g <- .lixoftCall("getGroups")[sapply(.lixoftCall("getGroups"), function(g) g$name == groupName)][[1]]
   }
   paramType <- g$parameter$type
 
   if (is.string(parameter) ) {
-    parameterValues <- utils::read.table(file = parameter, header = T, sep = .getDelimiter(parameter))
+    parameterValues <- utils::read.table(file=parameter, header=T, sep=.getDelimiter(parameter))
     namesParamValues <- names(parameterValues)
-    nameIntersect = intersect(namesParamValues, c('id', 'pop', 'occ', 'occ1', 'occ2', 'occevid'))
+    occasion_elements <- .lixoftCall("getOccasionElements")
+    nameIntersect <- intersect(namesParamValues,
+                               c('id', 'ID', 'pop', 'occ', 'occ1', 'occ2', 'occevid', unlist(occasion_elements$names)))
 
     if (length(nameIntersect)) {
       indexID_OCC = match(nameIntersect, namesParamValues)
@@ -480,173 +546,278 @@ inlineDataFrame <- function(str){
     paramNames <- names(parameter)
   }
 
+  # if ind params & pop params defined together --> raise error
+  parameterInd <- .filterParameter(parameter, type="ind")
+  parameterPop <- .filterParameter(parameter, type="pop")
+
+  # Add parameters -------------------------------------------------------------
   expectedParams <- c()
+  
+  if (length(parameterInd) > 0) {
+    # Add parameters that describe individuals
+    outIndivName <- .addIndParameter(parameter, groupName)
+    outName <- outIndivName
+    expectedParams <- c(expectedParams, .getParameterNames("indiv"))
 
-  # if ind params & pop params defined togerther --> raise error
-  parameterInd <- .getParameter(parameter, type = "ind")
-  parameterPop <- .getParameter(parameter, type = "pop")
+    .lixoftCall("setGroupElement", list(group=groupName, elements=outName))
+    
+    # remaining parameters
+    remainingParamNames <- names(.lixoftCall("getGroupRemaining", groupName))
+    if (length(intersect(remainingParamNames, names(parameterPop)))) {
+      remainingParamNames <- intersect(remainingParamNames, names(parameterPop))
+      remainingParams <- parameterPop[remainingParamNames]
+      .lixoftCall("setGroupRemaining", list(group=groupName, remaining=remainingParams))
+    }
 
-  if (length(parameterInd) > 0 & length(parameterPop) > 0) {
+  } else if (length(parameterPop) > 0) {
+    # Add parameters that describe populations
+    outPopName <- .addPopParameter(parameter, groupName)
+    outName <- outPopName
+    expectedParams <- c(expectedParams, .getParameterNames("pop"))
+
+    .lixoftCall("setGroupElement", list(group=groupName, elements=outName))
+    remainingParamNames <- NULL
+
+  } else {
+    remainingParamNames <- NULL
+  }
+  
+  if (length(parameterInd) > 0 & length(parameterPop[setdiff(names(parameterPop), remainingParamNames)]) > 0) {
     stop("Population parameters and individuals parameters cannot be defined together.", call. = FALSE)
   }
-
-  #---------------------------------------------------------------------------
-  # If the parameter describe a covariate
-  if (length(covElements) > 0) {
-    # Add a covariate element
-    outNameCov <- paste0('manCov', groupName, '_', length(.lixoftCall("getCovariateElements")) + 1)
-    covParam <- covElements[[1]]$data
-    covParamName <- names(covParam)[-1]
-
-    parameterCov <- .getParameter(parameter, type = "cov")
-
-    # check if cov parameters are missing
-    missingcov <- setdiff(covParamName, paramNames)
-    if (is.string(parameterCov)) {
-      messageMatch <- "parameter data"
-      names(messageMatch) <- paste0("'", parameterCov, "'")
-      .lixoftCall("defineCovariateElement",
-                  list(name = outNameCov, element = parameterCov),
-                  messageMatch = messageMatch)
-      outName <- c(outName, outNameCov)
-
-    } else if (!is.null(parameterCov)) {
-      covElement <- parameterCov
-
-      # if multiple values, transform covariates to dataframe
-      if (nrow(covElement) > 1) {
-        covElement <- cbind(data.frame(id = 1:nrow(covElement)), covElement)
-
-      } else if (length(missingcov)) {
-        # if missing covariate, replace values in default covariate element
-        covParam[names(parameterCov)] <- parameterCov
-        # covElement <- as.data.frame(matrix(covParam, ncol = length(covParam)))
-        covElement <- covParam
-
-      }
-
-      # Define covariate element
-      if (nrow(covElement) > 1) {
-        # Convert in text file
-        tempFile = .addDataFrameTemp(df = covElement)
-        messageMatch <- "covariate parameters data"
-        names(messageMatch) <- paste0("'", tempFile, "'")
-        .lixoftCall("defineCovariateElement", list(name = outNameCov, element = tempFile),
-                    messageMatch = messageMatch)
-
-      } else {
-        .lixoftCall("defineCovariateElement", list(name = outNameCov, element = covElement))
-      }
-      outName <- c(outName, outNameCov)
-    }
-    expectedParams <- c(expectedParams, covParamName)
-  }
-
-  #---------------------------------------------------------------------------
-  # If the parameter describe a population parameters
-  if (length(popElements) > 0 & length(parameterPop) > 0) {
-    # Add a population element
-    outNamePop <- paste0('manualPop', groupName,'_', length(.lixoftCall("getPopulationElements")) + 1)
-    popParam <- popElements[[1]]$data[-1]
-    if (is.data.frame(popParam)) {
-      popParam <- .transformToNumeric(popParam)
-    }
-    popParam <- unlist(popParam)
-    popParamName <- names(popParam)
-    if (is.string(parameterPop)) {
-      parameterValues <- utils::read.table(file = parameterPop, header = T, sep = .getDelimiter(parameterPop))
-      if (! "pop" %in% names(parameterValues)) {
-        stop("A data.frame of population parameters can only be used in combination with the argument 'npop'. ",
-             "The data frame must have a column 'pop'.", call. = FALSE)
-      }
-
-      tempFile = .addDataFrameTemp(parameterValues[names(parameterValues) != "pop"])
-      messageMatch <- "population parameters data"
-      names(messageMatch) <- paste0("'", tempFile, "'")
-      .lixoftCall("definePopulationElement", list(name = outNamePop, element = tempFile),
-                  messageMatch = messageMatch)
-      outName <- c(outName, outNamePop)
-
-    } else {
-      popElement <- as.data.frame(matrix(popParam, ncol = length(popParam)))
-      names(popElement) <- names(popParam)
-      popElement[names(parameterPop)] <- parameterPop
-
-      .lixoftCall("definePopulationElement", list(name = outNamePop, element = popElement))
-      outName <- c(outName, outNamePop)
-    }
-
-    # if (paramType == "population") expectedParams <- c(expectedParams, popParamName)
-    expectedParams <- c(expectedParams, popParamName)
-  }
-
-  #---------------------------------------------------------------------------
-  # If the parameter describe an individual parameters
-  if (length(indivElements) > 0 & length(parameterInd) > 0) {
-    # Add a population element
-    outNameIndiv <- paste0('manualIndiv', groupName, '_', length(.lixoftCall("getIndividualElements")) + 1)
-    indivParam <- unlist(indivElements[[1]]$data[-1])
-    indivParamName <- names(indivParam)
-
-    if (is.string(parameterInd)) {
-      messageMatch <- "individual parameters data"
-      names(messageMatch) <- paste0("'", parameterInd, "'")
-      .lixoftCall("defineIndividualElement", list(name = outNameIndiv, element = parameterInd),
-                  messageMatch = messageMatch)
-      outName <- c(outName, outNameIndiv)
-
-    } else {
-      indivElement <- as.data.frame(matrix(indivParam, ncol = length(indivParam)))
-      names(indivElement) <- names(indivParam)
-      indivElement[names(parameterInd)] <- parameterInd
-
-      .lixoftCall("defineIndividualElement", list(name = outNameIndiv, element = indivElement))
-      outName <- c(outName, outNameIndiv)
-    }
-    # if (paramType == "individual") expectedParams <- c(expectedParams, indivParamName)
-    expectedParams <- c(expectedParams, indivParamName)
-  }
-
+  
+  # Print Warning in case something is missing ---------------------------------
   # warn in case of missing parameters
   ismlxproject <- any(grepl("mlx", names(.lixoftCall("getOutputElements"))))
   .checkMissingParameters(paramNames, expectedParams, ismlxproject)
 
   # warn in case of extra parameters
-  .checkExtraParameters(paramNames, expectedParams)
-
-  if (is.null(groupName)) {
-    groupName <- .lixoftCall("getGroups")[[1]]$name
-  }
-
-  if (!is.null(outName)) {
-    for (index in seq_along(outName)) {
-      .lixoftCall("setGroupElement", list(group=groupName, elements = outName[index]))
-    }
-  }
+  # RETRO 2020 - Remove covariates from parameters
+  remainingParamNames <- names(.lixoftCall("getGroupRemaining", groupName))
+  .checkExtraParameters(setdiff(paramNames, c(.getParameterNames("cov"), remainingParamNames)),
+                        expectedParams)
 
   return(invisible(TRUE))
 }
 
+# Add Covariates in a group
+.addCovariate <- function(covariate, groupName = NULL){
+  covElements <- .lixoftCall("getCovariateElements")
+  
+  if (is.null(groupName)) {
+    groupName <- .lixoftCall("getGroups")[[1]]$name
+  }
 
-.getParameter <- function(parameter, type = "pop"){
-  extraNames <- c('id', 'pop', 'occ', 'occ1', 'occ2', 'occevid')
+  groups <- .lixoftCall("getGroups")
+  group <- groups[sapply(groups, function(g) g$name == groupName)][[1]]
+  paramType <- group$parameter$type
 
+  if (is.string(covariate)) {
+    covariateValues <- utils::read.table(file=covariate, header=T, sep=.getDelimiter(covariate))
+    namesCovValues <- names(covariateValues)
+    occasion_elements <- .lixoftCall("getOccasionElements")
+    nameIntersect <- intersect(namesCovValues,
+                               c('id', 'ID', 'pop', 'occ', 'occ1', 'occ2', 'occevid', unlist(occasion_elements$names)))
+    
+    if (length(nameIntersect)) {
+      indexID_OCC = match(nameIntersect, namesCovValues)
+      covNames <- namesCovValues[-indexID_OCC]
+    } else {
+      covNames <- namesCovValues
+    }
+    
+  } else {
+    covNames <- names(covariate)
+  }
+
+  # Add covariates -------------------------------------------------------------
+  expectedCov <- c()
+  
+  # Add parameters that describe covariates
+  outCovName <- .addCovParameter(covariate, covNames, groupName)
+
+  if (length(.lixoftCall("getCovariateElements")) > 0) {
+    expectedCov <- c(expectedCov, .getParameterNames("cov"))
+  }
+
+  # Print Warning in case something is missing ---------------------------------
+  # warn in case of missing parameters
+  ismlxproject <- any(grepl("mlx", names(.lixoftCall("getOutputElements"))))
+  .checkMissingParameters(covNames, expectedCov, ismlxproject)
+  
+  # warn in case of extra parameters
+  .checkExtraParameters(covNames, expectedCov)
+  
+  if (paramType == "individual") {
+    warning("Covariate won't be used because individual parameters have been defined.", call.=F)
+    return(invisible(TRUE))
+  } else if (!is.null(outCovName)) {
+    .lixoftCall("setGroupElement", list(group=groupName, elements=outCovName))
+  }
+  
+  return(invisible(TRUE))
+}
+
+.addCovParameter <- function(covariate, covariateNames, groupName) {
+  covElements <- .lixoftCall("getCovariateElements")
+  covariate <- .filterParameter(covariate, "cov")
+
+  if (length(covElements) == 0 | length(covariate) == 0) {
+    return(NULL)
+  }
+
+  covName <- paste0('manCov', groupName, '_', length(.lixoftCall("getCovariateElements")) + 1)
+  
+  # default covariate parameters
+  covParam <- covElements[[1]]$data
+  covParamName <- .getParameterNames("cov")
+
+  # check if covariate parameters are missing
+  missingcov <- setdiff(covParamName, covariateNames)
+  
+  # input is a dataframe
+  if (is.string(covariate)) {
+    messageMatch <- "parameter data"
+    names(messageMatch) <- paste0("'", covariate, "'")
+    .lixoftCall("defineCovariateElement",
+                list(name=covName, element=covariate),
+                messageMatch=messageMatch)
+
+  } else {
+    covElement <- covariate
+    # if multiple values, transform covariates to dataframe
+    if (nrow(covElement) > 1) {
+      covElement <- cbind(data.frame(id=1:nrow(covElement)), covElement)
+      
+    } else if (length(missingcov)) {
+      # if missing covariate, replace values in default covariate element
+      covParam[names(covariate)] <- covariate
+      covElement <- covParam
+      
+    }
+    
+    # Define covariate element
+    if (nrow(covElement) > 1) {
+      # Convert in text file
+      tempFile = .addDataFrameTemp(df=covElement)
+      messageMatch <- "covariate parameters data"
+      names(messageMatch) <- paste0("'", tempFile, "'")
+      .lixoftCall("defineCovariateElement", list(name=covName, element=tempFile),
+                  messageMatch=messageMatch)
+      
+    } else {
+      .lixoftCall("defineCovariateElement", list(name=covName, element=covElement))
+    }
+  }
+  return(covName)
+}
+
+# Add parameters that describe a population
+.addPopParameter <- function(parameter, groupName) {
+  popElements <- .lixoftCall("getPopulationElements")
+  inputPop <- .filterParameter(parameter, type="pop")
+
+  if (length(popElements) == 0 | length(inputPop) == 0) {
+    return(NULL)
+  }
+
+  popName <- paste0('manualPop', groupName,'_', length(.lixoftCall("getPopulationElements")) + 1)
+  
+  # default pop parameters
+  popParamName <- .getParameterNames("pop")
+  popParam <- popElements[[1]]$data[popParamName]
+  if (is.data.frame(popParam)) {
+    popParam <- .transformToNumeric(popParam)
+  }
+  popParam <- unlist(popParam)
+  
+  # input is a dataframe
+  if (is.string(inputPop)) {
+    parameterValues <- utils::read.table(file=inputPop, header=T, sep=.getDelimiter(inputPop))
+    if (! "pop" %in% names(parameterValues)) {
+      stop("A data.frame of population parameters can only be used in combination with the argument 'npop'. ",
+           "The data frame must have a column 'pop'.", call. = FALSE)
+    }
+    
+    tempFile = .addDataFrameTemp(parameterValues[names(parameterValues) != "pop"])
+    messageMatch <- "population parameters data"
+    names(messageMatch) <- paste0("'", tempFile, "'")
+    .lixoftCall("definePopulationElement", list(name=popName, element=tempFile),
+                messageMatch=messageMatch)
+    
+  } else {
+    popElement <- as.data.frame(matrix(popParam, ncol= length(popParam)))
+    names(popElement) <- names(popParam)
+    popElement[names(inputPop)] <- inputPop
+    
+    .lixoftCall("definePopulationElement", list(name=popName, element=popElement))
+  }
+  
+  return(popName)
+}
+
+# Add parameters describe an individual
+.addIndParameter <- function(parameter, groupName) {
+  indivElements <- .lixoftCall("getIndividualElements")
+  inputIndiv <- .filterParameter(parameter, type="indiv")
+  
+  if (length(indivElements) == 0 | length(inputIndiv) == 0) {
+    return(NULL)
+  }
+  
+  indivName <- paste0('manualIndiv', groupName, '_', length(.lixoftCall("getIndividualElements")) + 1)
+  
+  # default indiv parameters
+  indivParamName <- .getParameterNames("indiv")
+  indivParam <- unlist(indivElements[[1]]$data[indivParamName])
+  
+  # input is a dataframe
+  if (is.string(inputIndiv)) {
+    messageMatch <- "individual parameters data"
+    names(messageMatch) <- paste0("'", inputIndiv, "'")
+    .lixoftCall("defineIndividualElement", list(name=indivName, element=inputIndiv),
+                messageMatch = messageMatch)
+
+  } else {
+    indivElement <- as.data.frame(matrix(indivParam, ncol=length(indivParam)))
+    names(indivElement) <- names(indivParam)
+    indivElement[names(inputIndiv)] <- inputIndiv
+    
+    .lixoftCall("defineIndividualElement", list(name=indivName, element=indivElement))
+    
+  }
+  return(indivName)
+}
+
+.getParameterNames <- function(type="pop") {
+  occasion_elements <- .lixoftCall("getOccasionElements")
   # Parameters that describes a covariate
   if (type == "cov") {
     elements <- .lixoftCall("getCovariateElements")
     if (length(elements) == 0) return(NULL)
-    elementNames <- names(elements[[1]]$data)[-1]
-
+    elementNames <- names(elements[[1]]$data)
+    paramNames <- setdiff(elementNames, c("ID", "id", unlist(occasion_elements$names)))
+    
   } else if (type == "pop") {
     elements <- .lixoftCall("getPopulationElements")
     if (length(elements) == 0) return(NULL)
-    elementNames <- names(unlist(elements[[1]]$data[-1]))
-
+    elementNames <- names(unlist(elements[[1]]$data))
+    paramNames <- setdiff(elementNames, "id")
   } else {
     elements <- .lixoftCall("getIndividualElements")
     if (length(elements) == 0) return(NULL)
-    elementNames <- names(unlist(elements[[1]]$data[-1]))
+    elementNames <- names(unlist(elements[[1]]$data))
+    paramNames <- setdiff(elementNames, "id")
   }
+  return(paramNames)
+}
+
+.filterParameter <- function(parameter, type = "pop", store_dataframe=T, unlistOutput=F){
+  occasion_elements <- .lixoftCall("getOccasionElements")
+  # extraNames <- c('id', 'pop', 'occ', 'occ1', 'occ2', 'occevid')
+  extraNames <- c("id", "pop", "ID", unlist(occasion_elements$names))
+
+  elementNames <- .getParameterNames(type)
 
   if (is.string(parameter)) {
     # filter dataframe with cov / ind / pop parameters only
@@ -690,7 +861,11 @@ inlineDataFrame <- function(str){
       if (nrow(parameterValues) == 1) {
         parameter <- as.data.frame(as.list(parameterValues))
       } else {
-        parameter <- .addDataFrameTemp(parameterValues)
+        if (store_dataframe) {
+          parameter <- .addDataFrameTemp(parameterValues)
+        } else {
+          parameter <- parameterValues
+        }
       }
     } else {
       parameter <- parameterValues
@@ -699,62 +874,108 @@ inlineDataFrame <- function(str){
     parameter <- as.data.frame(as.list(parameter))
     parameter <- parameter[names(parameter) %in% elementNames]
     parameter <- .transformToNumeric(parameter)
+    
+    if (unlistOutput) {
+      parameter <- unlist(parameter)
+    }
 
-    # filter dataframe with cov / ind / pop parameters only
-    # if (all(sapply(parameter, function(p) length(p) == 1))) {
-    #   parameter <- unlist(parameter)
-    # }
-    # parameter <- parameter[names(parameter) %in% elementNames]
-    #
-    # # transform data to numeric
-    # parameter <- sapply(parameter,
-    #                     function(p) ifelse(suppressWarnings(is.na(as.numeric(p))), p, as.numeric(p)))
   }
   return(parameter)
 }
 
+.getAllowedMlxParameterNames <- function(type="all") {
+  if (type == "pop") {
+    allowedParams <- c("mlx_Pop", "mlx_PopUncertainSA", "mlx_PopUncertainLin")
+  } else if (type == "ind") {
+    allowedParams <- c("mlx_PopIndiv","mlx_PopIndivCov","mlx_CondMean","mlx_EBEs","mlx_CondDistSample")
+  } else {
+    allowedParams <- c(.getAllowedMlxParameterNames("pop"), .getAllowedMlxParameterNames("ind"))
+  }
+  return(allowedParams)
+}
+
+.getMlxParameterNames <- function(type="all") {
+  if (type == "pop") {
+    popElements <- names(.lixoftCall("getPopulationElements"))
+    extfiles_path <- file.path(.lixoftCall("getProjectSettings")$directory, "ExternalFiles")
+    
+    # 2021 ! To remove in 2022 when function getPopulationElements is fixed
+    # check if popUncertainLin exists
+    if (file.exists(file.path(extfiles_path, "mlx_PopUncertainLin.dat"))) {
+      popElements <- c(popElements, "mlx_PopUncertainLin")
+    }
+    # check if popUncertainSA exists
+    if (file.exists(file.path(extfiles_path, "mlx_PopUncertainSA.dat"))) {
+      popElements <- c(popElements, "mlx_PopUncertainSA")
+    }
+    
+    paramNames <- intersect(
+      unique(popElements),
+      .getAllowedMlxParameterNames("pop")
+    )
+  } else if (type == "ind") {
+    paramNames <- intersect(
+      names(.lixoftCall("getIndividualElements")),
+      .getAllowedMlxParameterNames("ind")
+    )
+  } else {
+    paramNames <- c(.getMlxParameterNames("pop"), .getMlxParameterNames("ind"))
+  }
+  return(paramNames)
+}
+
+.getAllowedMlxCovariateNames <- function() {
+  allowedCov <- c("mlx_Cov", "mlx_CovDist")
+  return(allowedCov)
+}
+
+.getMlxCovariateNames <- function() {
+  covNames <- intersect(
+    names(.lixoftCall("getCovariateElements")),
+    .getAllowedMlxCovariateNames()
+  )
+  return(covNames)
+}
+
 .addMlxParameter <- function(parameter, groupName = NULL){
-  if(is.null(parameter)) {
-    return(invisible(TRUE))
-  }
-
-  if (! parameter[1] %in% c("mode", "mean", "pop")) {
-    return(invisible(TRUE))
-  }
-
   if (is.null(groupName)) {
     groupName <- .lixoftCall("getGroups")[[1]]$name
   }
-
-  if (parameter[1] == "mode") {
-    if (! "mlx_EBEs" %in% names(.lixoftCall("getIndividualElements"))) {
-      stop("Invalid parameter mode. EBEs parameters were not found in monolix project.", call. = FALSE)
-    }
-    .lixoftCall("setGroupElement", list(group = groupName, elements = "mlx_EBEs"))
-
-  } else if(parameter[1] == "mean") {
-    if (! "mlx_CondMean" %in% names(.lixoftCall("getIndividualElements"))) {
-      stop("Invalid parameter mean. Conditional mean parameters were not found in monolix project.", call. = FALSE)
-    }
-    .lixoftCall("setGroupElement", list(group = groupName, elements = "mlx_CondMean"))
-
-  } else {
-    if (! "mlx_CondMean" %in% names(.lixoftCall("getIndividualElements"))) {
-      stop("Invalid parameter pop. Individual population parameters were not found in monolix project.", call. = FALSE)
-    }
-    .lixoftCall("setGroupElement", list(group = groupName, elements = "mlx_PopIndiv"))
+  if (! parameter %in% .getMlxParameterNames()) {
+      stop("Invalid parameter. ", parameter, " not found in Monolix project. ",
+           "Available monolix parameters are ", paste(.getMlxParameterNames(), collapse=", "),
+           ".", call.=F)
   }
+  .lixoftCall("setGroupElement", list(group = groupName, elements = parameter))
 
-  remaining <- .lixoftCall("getGroupRemaining", list(group = groupName))
-  popData <- .lixoftCall("getPopulationElements")$mlx_Pop$data
+  # set remaining parameters
+  if (parameter %in% .getMlxParameterNames("ind")) {
+    remaining <- .lixoftCall("getGroupRemaining", list(group = groupName))
+    popData <- .lixoftCall("getPopulationElements")$mlx_Pop$data
+    
+    namesPopData <- names(popData)
+    for (indexParam in seq_along(remaining)) {
+      remainingName <- names(remaining)[indexParam]
+      remaining[indexParam] <- popData[which(namesPopData==remainingName)]
+    }
+    
+    .lixoftCall("setGroupRemaining", list(group = groupName, remaining = remaining))
 
-  namesPopData <- names(popData)
-  for (indexParam in seq_along(remaining)) {
-    remainingName <- names(remaining)[indexParam]
-    remaining[indexParam] <- popData[which(namesPopData==remainingName)]
   }
+  
+  return(invisible(TRUE))
+}
 
-  .lixoftCall("setGroupRemaining", list(group = groupName, remaining = remaining))
+.addMlxCovariate <- function(covariate, groupName = NULL){
+  if (is.null(groupName)) {
+    groupName <- .lixoftCall("getGroups")[[1]]$name
+  }
+  if (! covariate %in% .getMlxCovariateNames()) {
+    stop("Invalid covariate. ", covariate, " not found in Monolix project. ",
+         "Available monolix covariates are ", paste(.getMlxCovariateNames(), collapse=", "),
+         ".", call.=F)
+  }
+  .lixoftCall("setGroupElement", list(group = groupName, elements = covariate))
 
   return(invisible(TRUE))
 }
@@ -775,31 +996,77 @@ inlineDataFrame <- function(str){
   # add parameters in group
   if ("parameter" %in% names(group)) {
     parameter = group$parameter
-
-    if(parameter[1] %in% c("mode", "mean", "pop")) {
+    
+    if (parameter[1] %in% .getAllowedMlxParameterNames()) {
       .addMlxParameter(parameter, groupName)
+      
     } else {
       .addParameter(parameter = parameter, groupName)
     }
+    
   }
 
+  # add covariates in group
+  # RETRO 2020 - Include covariates from parameters argument
+  if ("parameter" %in% names(group)) {
+    p <- group$parameter
+    if (! p %in% .getAllowedMlxParameterNames()) {
+      covFromParameter <- .filterParameter(p, "cov", store_dataframe=F, unlistOutput=T)
+      if (! is.null(covFromParameter)) {
+        message("[INFO] Using 'parameter' argument to define covariates is deprecated. Use 'covariate' argument instead.")
+        if (is.string(group$covariate)) {
+          if (group$covariate[1] %in% .getAllowedMlxCovariateNames()) {
+            stop("You must either define covariate with a string corresponding to the element generated by Monolix, or with a list.", call.=F)
+          }
+          group$covariate <- utils::read.table(file=group$covariate, header=T, sep=.getDelimiter(covariate))
+        }
+        group$covariate <- .transformParameter(list(
+          covFromParameter,
+          group$covariate
+        ))
+        
+        if (is.data.frame(group$covariate)) {
+          group$covariate <- .addDataFrameTemp(df=group$covariate)
+        }
+      }
+      if (is.null(c(.filterParameter(p, "ind"), .filterParameter(p, "pop")))) {
+        group$parameter <- NULL
+      }
+    }
+  }
+  
+  if (! is.null(group$covariate)) {
+    covariate = group$covariate
+
+    if (covariate[1] %in% .getAllowedMlxCovariateNames()) {
+      .addMlxCovariate(covariate, groupName)
+    } else {
+      .addCovariate(covariate=covariate, groupName)
+    }
+  }
+  
+  # add output in group
   if ("output" %in% names(group)) {
-    .addOutput(output = group$output, groupName)
+    .addOutput(output=group$output, groupName)
   }
 
+  # add treatment in group
   if ("treatment" %in% names(group)) {
-    .addTreatment(treatment = group$treatment, groupName)
+    treatment <- group$treatment
+    .addTreatment(treatment, groupName)
   }
 
+  # add regressor in group
   if ("regressor" %in% names(group)) {
     .addRegressor(group$regressor, groupName)
   }
 
+  # set size of the group
   if ("size" %in% names(group)) {
     .lixoftCall("setGroupSize", list(groupName, group$size))
   }
 
-  return(invisible(TRUE))
+  return(group)
 }
 
 ################################################################################
@@ -966,10 +1233,23 @@ inlineDataFrame <- function(str){
 
   # if parameter is a list of parameters list: we concatenate lists
   if (.is_list_or_named_vector(parameter)) {
+    # remove NULL in list
+    parameter[sapply(parameter, is.null)] <- NULL
+    if (length(parameter) == 0) {
+      return(NULL)
+    }
+    for (i in seq_along(parameter)) {
+      p <- parameter[[i]]
+      if (is.string(p) && file.exists(p)) {
+        .checkExtension(.getFileExt(p), "parameter file extension")
+        parameter[[i]] <- utils::read.table(file=p, header=T, sep=.getDelimiter(p))
+      }
+    }
     if (all(sapply(parameter, .is_list_or_named_vector))) {
       parameter <- .mergeParameter(parameter)
     }
   }
+  
   return(parameter)
 }
 
@@ -1080,37 +1360,37 @@ inlineDataFrame <- function(str){
   ntreat <- length(treatment)
   for (itr in seq_along(treatment)) {
     trt <- treatment[[itr]]
-    # if multiple admin types -> split treatments
+    
+    if (is.string(trt)) {
+      next
+    }
+    # if multiple admin types or multiple probaMissDose -> split treatments
     admColumn <- names(trt)[names(trt) %in% c("adm", "type")]
-    tColumn <- names(trt)[names(trt) == "time"]
-    amtColumn <- names(trt)[names(trt) %in% c("amt", "amount")]
+    complianceColumn <- names(trt)[names(trt) == "probaMissDose"]
+    
+    trt_repeat <- trt$repeats
+    if (! is.data.frame(trt)) trt <- trt[names(trt) != "repeats"]
 
-    if (length(admColumn)) {
-      admns <- unique(trt[[admColumn]])
-      if (length(admns) > 1) {
-        for (iadmn in seq_along(admns)) {
-          admn <- admns[iadmn]
-          if (iadmn == 1) {
-            idx <- itr
-          } else {
-            idx <- length(treatment) + 1
+    if (! is.null(c(admColumn, complianceColumn))) {
+      trt_list <- split(as.data.frame(trt), trt[c(admColumn, complianceColumn)])
+      trt_list <- trt_list[sapply(trt_list, nrow) > 0]
+
+      for (i in seq_along(trt_list)) {
+        trt_i <- trt_list[[i]]
+        idx <- ifelse(i == 1, itr, length(treatment) + 1)
+
+        if (! is.data.frame(trt)) {
+          trt_i <- as.list(trt_i)
+          trt_i$repeats <- trt_repeat 
+          if (length(admColumn) > 0) {
+            trt_i[[admColumn]] <- trt_i[[admColumn]][1]
           }
-          if (is.data.frame(trt)) {
-            newtrt <- trt[trt[[admColumn]] == admn,]
-          } else {
-            newtrt <- list()
-            if (length(trt[[amtColumn]]) > 1) {
-              newtrt[[amtColumn]] <- trt[[amtColumn]][trt[[admColumn]] == admn]
-            } else {
-              newtrt[[amtColumn]] <- trt[[amtColumn]][1]
-            }
-            newtrt[[tColumn]] <- trt[[tColumn]][trt[[admColumn]] == admn]
-            newtrt[[admColumn]] <- admn
+          if (length(complianceColumn) > 0) {
+            trt_i[[complianceColumn]] <- trt_i[[complianceColumn]][1]
           }
-          treatment[[idx]] <- newtrt
         }
-      } else if (!is.data.frame(trt) & length(trt[[admColumn]]) > 1) {
-        treatment[[itr]][[admColumn]] <- trt[[admColumn]][1]
+  
+        treatment[[idx]] <- trt_i
       }
     }
   }
@@ -1126,11 +1406,12 @@ inlineDataFrame <- function(str){
   outInfo <- NULL
   isGroup <- FALSE
   if (! is.null(outputParam)) {
-    outId <- which(sapply(outputParam, function(o) outputName %in% o$name))
-    if (length(outId))
+    outId <- which(sapply(outputParam, function(o) ifelse("name" %in% names(o), outputName %in% o$name, o == paste0("mlx_", outputName))))
+    if (length(outId)) {
       outInfo <- outputParam[[outId]]
+    }
   } else if (!is.null(groupParam)) {
-    outInfo <- sapply(groupParam, function(g) g$output[sapply(g$output, function(o) outputName %in% o$name)])
+    outInfo <- sapply(groupParam, function(g) g$output[sapply(g$output, function(o) ifelse("name" %in% names(o), outputName %in% o$name, o == paste0("mlx_", outputName)))])
     isGroup <- TRUE
   }
   isCens <- any(sapply(outInfo, function(o) any(is.element(c("lloq", "limit", "uloq"), names(o)))))
@@ -1166,3 +1447,45 @@ inlineDataFrame <- function(str){
   }
   return(data)
 }
+
+# Return the number of ids in a dataframe
+.getNbIds <- function(data) {
+  indexID <- which(names(data) == 'id')
+  if (length(indexID) > 0) {
+    nbID <- length(unique(data[,indexID[1]]))
+  } else {
+    nbID <- NULL
+  }
+  return(nbID)
+}
+
+.getOverlapOccasion <- function() {
+  occInfo <- .lixoftCall("getOccasionElements")
+  overlap <- c()
+  for (i in seq_along(occInfo$name)) {
+    occasions <- sapply(occInfo$occasions, function(occ) occ[[i]])
+    times <- occInfo$time
+    occTime <- NULL
+    occlevel <- sort(unique(occasions))
+    for (o in occlevel) {
+      occTime[[o]] <- unique(times[occasions == o])
+    }
+    if (! length(unique(occTime)) == length(occlevel)) {
+      overlap <- c(overlap, occInfo$name[[i]])
+    }
+  }
+  return(overlap)
+}
+
+.fill_occasion <- function(df, occ, occTime, occname) {
+  df[[occname]] <- 1
+
+  maxTime <- max(max(occTime + 1), max(df$time) + 1)
+  occTime <- unique(c(occTime, maxTime))
+  
+  for (idx in seq_along(occ)) {
+    df[(df$time >= occTime[idx]) & (df$time < occTime[idx + 1]), occname] <- occ[[idx]]
+  }
+  return(df)
+}
+

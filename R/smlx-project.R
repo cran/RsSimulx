@@ -19,21 +19,7 @@
   }
   
   # check extension & add extension if needed
-  ext <- .getFileExt(project)
-  if (is.null(ext)) {
-    if (software == "simulx") {
-      project <- paste0(project, ".smlx")
-    } else if (software == "monolix") {
-      project <- paste0(project, ".mlxtran")
-    } else {
-      return()
-    }
-  } else {
-    if (software == "simulx" & ext != "smlx")
-      stop("Invalid extension for a simulx project. smlx extension is expected.", call. = F)
-    if (software == "monolix" & ext != "mlxtran")
-      stop("Invalid extension for a monolix project. mlxtran extension is expected.", call. = F)
-  }
+  project <- .checkProjectExtension(project, software)
   
   # if monolix project --> reinit connectors
   lixoftConnectorsState <- NULL

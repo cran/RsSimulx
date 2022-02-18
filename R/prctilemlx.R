@@ -83,7 +83,7 @@
 #'   print(pr.out$y[1:5,])
 #' }
 #' @importFrom ggplot2 ggplot geom_point theme aes geom_line xlab ylab facet_wrap facet_grid
-#' scale_color_manual scale_alpha_manual guide_legend
+#' scale_color_manual scale_alpha_manual guide_legend geom_polygon
 #' @importFrom stats quantile 
 #' @export         
 prctilemlx <- function(r = NULL, col=NULL, project = NULL, outputVariableName = NULL,

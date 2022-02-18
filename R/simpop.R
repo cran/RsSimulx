@@ -108,9 +108,19 @@ simpopmlx <- function(n = 1, project = NULL, fim = NULL, parameter = NULL,
   tryCatch(
     s.res <- .generatePopParams(mu, sd, trans, bound_min, bound_max, corr, pname, kw.max, n, seed),
     error = function(e) {
-      stop("The Fisher Information matrix does not allow to simulate population parameters", call. = FALSE)
+      acceptedErrors <- c(
+        "The correlation matrix of the estimates contains NaN.",
+        "You should not use parameter names with '_'.",
+        "Maximum number of iterations reached: could not draw definite positive correlation matrix."
+      )
+      e <- gsub("\n$", "", gsub("^Error: ", "", as.character(e)))
+      if (any(sapply(acceptedErrors, function(err) grepl(err, e)))) {
+        stop(e, call. = F)
+      }
+      stop("The Fisher Information matrix does not allow to simulate population parameters.", call. = FALSE)
     }
   )
+  # s.res <- .generatePopParams(mu, sd, trans, bound_min, bound_max, corr, pname, kw.max, n, seed)
   
   # Prepare results ------------------------------------------------------------
   s.res <- as.data.frame(s.res)
@@ -154,7 +164,7 @@ simpopmlx <- function(n = 1, project = NULL, fim = NULL, parameter = NULL,
 
   # error if population parameter estimation not launched
   if (.lixoftCall("getLaunchedTasks")[["populationParameterEstimation"]] == FALSE) {
-    stop("Population parameter estimation has not been launched in monolix project.", call. = FALSE)
+    stop("Population parameter estimation has not been launched in Monolix project.", call. = FALSE)
   }
   #----------------------------------------------------------------------------------------
   # Prepare the population parameters
@@ -195,8 +205,8 @@ simpopmlx <- function(n = 1, project = NULL, fim = NULL, parameter = NULL,
 
   # check fim
   namesFish <- .lixoftCall("getLaunchedTasks")[["standardErrorEstimation"]]
-  if (namesFish == FALSE) {
-    stop("Standard errors have not been calculated in monolix project.", call. = FALSE)
+  if (any(namesFish == FALSE)) {
+    stop("Standard errors have not been calculated in Monolix project.", call. = FALSE)
   }
   if (is.null(fim)) {
     if ("stochasticApproximation" %in% namesFish) {
@@ -230,7 +240,12 @@ simpopmlx <- function(n = 1, project = NULL, fim = NULL, parameter = NULL,
 
   param$sd <- param$initialValue
   for (index in seq_along(param$pop.param)) {
-    param$sd[index] <- sd[[param$name[index]]]
+    param_name = param$name[index]
+    if ("parameter" %in% names(sd)) {
+      param$sd[index] <- sd[sd$parameter == param_name, "se"]
+    } else if (param_name %in% names(sd)) {
+      param$sd[index] <- sd[[param_name]]
+    }
   }
   param$trans <- "L"
   param$lim.a <- rep(NA, nrow(param))
@@ -326,8 +341,9 @@ simpopmlx <- function(n = 1, project = NULL, fim = NULL, parameter = NULL,
     corr1 <- diag(rep(1,length(i1)))
   }
   
-  if (length(which(is.na(corr1)))>0)
+  if (length(which(is.na(corr1))) > 0) {
     stop("The correlation matrix of the estimates contains NaN.", call. = F)
+  }
 
   # Generate population parameters ---------------------------------------------
   se1 <- sd[i1]
@@ -370,8 +386,9 @@ simpopmlx <- function(n = 1, project = NULL, fim = NULL, parameter = NULL,
     nk1 <- vector(length = n.corr)
     nk2 <- vector(length = n.corr)
     for (k in (1:n.corr)){
-      if (length(g[[k]]) > 2)
-        stop('You should not use parameter names with "_" ', call. = F)
+      if (length(g[[k]]) > 2) {
+        stop("You should not use parameter names with '_'.", call. = F)
+      }
       cnk <- corr.name[k]
       gk <- g[[k]][1:2]
       nk1[k] <- substr(cnk, gk[1] + 1, gk[2] - 1)
@@ -392,12 +409,13 @@ simpopmlx <- function(n = 1, project = NULL, fim = NULL, parameter = NULL,
   kw <- 0
   while (n1 > 0) {
     kw <- kw + 1
-    if (kw > kw.max)
-      stop("Maximum number of iterations reached: could not draw definite positive correlation matrix", call. = F)
+    if (kw > kw.max) {
+      stop("Maximum number of iterations reached: could not draw definite positive correlation matrix.", call. = F)
+    }
     x <- matrix(rnorm(K * n1), ncol = K)
     st <- t(t(x %*% Rt) + mut)
     st[,iL] <- exp(st[,iL])
-    st[,iG] <- (bound_min1[iG] + bound_max1[iG] * exp(st[,iG])) / (1 + exp(st[,iG]))
+    st[,iG] <- t(bound_min1[iG] + bound_max1[iG] * t(exp(st[,iG]))) / (1 + exp(st[,iG]))
     st[,iP] <- pnorm(st[,iP])
     st[,iR] <- (exp(st[,iR]) - 1) / (exp(st[,iR]) + 1)
     s <- t(replicate(n1, mu))
@@ -417,7 +435,6 @@ simpopmlx <- function(n = 1, project = NULL, fim = NULL, parameter = NULL,
       n1 <- 0
       s.res <- s
     }
-    
   }
   return(s.res)
 }

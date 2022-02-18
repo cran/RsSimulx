@@ -257,7 +257,7 @@ writeData <- function(project = NULL, filename = "simulated_dataset.csv",
       gcovnames <- setdiff(names(cov), subjocc)
     }
     gsim <- simulation$IndividualParameters[[gname]]
-    gsim <- subset(gsim, select = c(subjocc, gcovnames))
+    gsim <- gsim[intersect(names(gsim), c(subjocc, gcovnames))]
     gsim$group <- gname
     covData <- rbind(covData, gsim)
   }

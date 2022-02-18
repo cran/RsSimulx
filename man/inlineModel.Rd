@@ -23,7 +23,7 @@ myModel <- inlineModel("
 [LONGITUDINAL]
 input = {A, k, c, a}
 EQUATION:
-t0    = 0 
+t0    = 0
 f_0   = A
 ddt_f = -k*f/(c+f)
 DEFINITION:

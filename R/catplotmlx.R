@@ -60,155 +60,133 @@
 #'                     b=rep(c(0.2,0.2,0.4,0.4),each=Ng))
 #'   catplotmlx(res$y, group=cov) 
 #' }
-#' @importFrom ggplot2 ggplot aes geom_polygon xlab ylab ylim ggtitle scale_fill_manual facet_wrap facet_grid
+#' @importFrom ggplot2 ggplot aes xlab ylab ylim ggtitle scale_fill_manual facet_wrap facet_grid geom_ribbon
 #' @importFrom graphics hist 
 #' @importFrom grDevices hsv rgb2hsv col2rgb 
 #' @export         
 catplotmlx <- function(r, col=NULL, breaks=NULL, plot=TRUE, color="#194280", 
-                       group=NULL, facet=TRUE, labels=NULL) {
+                           group=NULL, facet=TRUE, labels=NULL) {
   if (is.null(r))
     stop("input of catplotmlx is empty!", call.=FALSE)
   
+  r.names <- names(r)
+  
   if (is.null(col)) {
-    r.names <- names(r)
-    if (any(r.names=="id")) {
-      col[1] <- which(r.names=="id")
-    } else {
-      col[1] <- 1
-    }
-    if (any(r.names=="time")) {
-      col[2] <- which(r.names=="time")
-    } else {
-      col[2] <- 2
-    }
-    if (!is.null(attr(r,"name"))) {
-      col[3] <- max(which(r.names==attr(r,"name")))
-    } else {
-      col[3] <- 3
-    }
+    col <- c(
+      ifelse(any(r.names=="id"), which(r.names=="id"), 1),
+      ifelse(any(r.names=="time"), which(r.names=="time"), 2),
+      ifelse(!is.null(attr(r,"name")), max(which(r.names==attr(r,"name"))), 3)
+    )
   }
   
-  if (is.null(breaks)){
-    t <- sort(unique(r[,col[2]]))
-    nt <- length(t)
-    zt <- c(t[1]-1,t,t[nt]+1)
-    zt <- (zt[1:(nt+1)] + zt[2:(nt+2)])/2
-  }else{
-    if (length(breaks)>1){
-      zt <- breaks
-      nt <- length(zt)-1
-    }else{
-      nt  <- breaks
-      zt1 <- min(r[,col[2]])
-      zt2 <- max(r[,col[2]])
-      dzt <- (zt2-zt1)/(10*nt)
-      zt  <- seq(zt1-dzt,zt2+dzt,length.out=(nt+1))
+  if (is.null(group)) {
+    if ("group" %in% names(r)) {
+      group <- "group"
     }
-    t <- (zt[1:(nt)] + zt[2:(nt+1)])/2
-  }
-  
-  r.name <- names(r)[col[3]]
-  names(r)[col[3]] <- "y"
-  r$y<- factor(r$y)
-  y.levels <- levels(r[,col[3]])
-  y.nlevels <- nlevels(r[,col[3]])
-  # z <- c(y[1]-1,y,y[y.nlevels]+1)
-  # br <- (z[1:(y.nlevels+1)] + z[2:(y.nlevels+2)])/2
-  v <- rep(y.levels, each=2*nt)
-  x <- rep(c(t,rev(t)),y.nlevels)
-  
-  sfm <- list()
-  col.hsv <- rgb2hsv(col2rgb(color))
-  color=hsv(col.hsv[1],col.hsv[2],col.hsv[3],seq(0.3,0.9,length.out=y.nlevels))
-  sfm = scale_fill_manual(name=r.name,values=color)
-  
-  if (!is.null(r$group) & is.null(group)) {
-    group <- "group"
-  } else if (length(group)==1 && group=="none") {
-    group = NULL
-  }
-  
-  if (is.data.frame(group)) {
-    attr.name <- attr(r,"name")
-    r <- merge(r,group,by="id",sort=FALSE)
-    attr(r,"name") <- attr.name
-    group <- names(group)
-    group <- group[-which(group=="id")]
-  }
-  
-  if (!is.null(labels)) {
-    if (length(group)==1) 
-      labels <- ifelse(is.list(labels),labels, list(labels))
-    for (k in (1: length(group)))
-      r[[group[k]]] <- factor(r[[group[k]]], labels=labels[[k]])
+  } else {
+    if (length(group) == 1 && group=="none") {
+      group = NULL
+    } else if (is.data.frame(group)) {
+      group_df <- group
+      group <- setdiff(names(group), names(r)[col[1]])
+      r <- merge(r, group_df, sort=FALSE)
+    }
+    if (!is.null(group)) {
+      group <- intersect(group, names(r))
+    }
+    if (length(group) == 0) {
+      group <- NULL
+    }
   }
 
-    if (!is.null(group)) {
-    ig <- interaction(r[group])
-  } else {
-    n.tot <- dim(r)[1]
-    ig <- factor(rep(1, n.tot))
-  }
-  
-  ug <- levels(ig)
-  ng <- length(ug)
-  N <- nlevels(r$id)
-  
-  y <- list()
-  for (k in (1:ng)) {
-    jk <- which(ig==ug[k])
-    rk<-r[jk,col[3]]
-    H <- matrix(nrow=nt,ncol=y.nlevels)
-    for (j in (1:nt)){
-      yj <- rk[which(r$time>zt[j] & r$time<zt[j+1] )]
-      hj <- table(yj)
-      H[j,] <- hj/sum(hj)
+  data <- r[unique(c(col, which(names(r) %in% group)))]
+  match_name <- c(id = names(data)[1], time = names(data)[2], y = names(data)[3])
+  yname <- names(data)[3]
+  names(data)[1:3] <- c("id", "time", "y")
+
+  if (is.null(breaks)){
+    bins_middle <- sort(unique(data$time))
+    nbins <- length(bins_middle)
+    breaks <- c(bins_middle[1] - 1, bins_middle, bins_middle[nbins] + 1)
+    breaks <- utils::head(breaks, -1) + diff(breaks) / 2
+  } else{
+    if (length(breaks) > 1){
+      nbins <- length(breaks) - 1
+    } else{
+      nbins  <- breaks
+      zt1 <- min(data$time)
+      zt2 <- max(data$time)
+      dzt <- (zt2 - zt1) / (10 * nbins)
+      breaks  <- seq(zt1 - dzt, zt2 + dzt, length.out=(nbins + 1))
     }
-    H <- cbind(0,H)
-    y[[k]] <- apply(H, 1, cumsum)
+    bins_middle <- utils::head(breaks, -1) + diff(breaks) / 2
+  }
+
+  data$y <- factor(data$y)
+
+  sfm <- list()
+  col.hsv <- rgb2hsv(col2rgb(color))
+  color <- hsv(col.hsv[1], col.hsv[2], col.hsv[3], seq(0.3, 0.9, length.out=nlevels(data$y)))
+  sfm <- scale_fill_manual(name=match_name[["y"]], values=color)
+
+  if (!is.null(labels)) {
+    if (length(group) == 1) {
+      labels <- ifelse(is.list(labels), labels, list(labels))
+    }
+
+    for (k in seq_along(group)) {
+      data[[group[k]]] <- factor(data[[group[k]]], labels=labels[[k]])
+    }
   }
   
-  if (plot==TRUE) {
-    datapoly <- NULL
-    pk <- ggplotmlx()
-    for (k in (1:ng)) {
-      Hk <- y[[k]]
-      pr <- NULL
-      for (j in (1:y.nlevels))
-        pr <- c(pr,Hk[j,],rev(Hk[j+1,]))
-      dk <- data.frame(x,pr,v)  
-      if (!is.null(group)) {
-        jk <- which(ig==ug[k])
-        dk[group] <- r[group][jk[1],]
+  data$bin <- cut(data$time, breaks=breaks, include.lowest=TRUE, labels=bins_middle)
+  perc <- stats::aggregate(
+    data$y, by = data[c("bin", group)],
+    function(y) cumsum(table(y) / length(y))
+  )
+  perc <- as.data.frame(as.list(perc))
+  perc$baseline <- 0
+  names(perc) <- c("bin", group, levels(data$y), "baseline")
+  perc <- perc[c("bin", group, "baseline", levels(data$y))]
+  
+  if (plot == T) {
+    levels <- c("baseline", levels(data$y))
+    perc_ <- stats::reshape(perc, idvar = "id", ids = row.names(perc),
+                           times = levels, timevar = "y_level",
+                           varying = list(levels), direction = "long")
+    perc_ <- .renameColumns(perc_, "baseline", "perc_values")
+    row.names(perc_) <- NULL
+    perc_$y_level <- factor(perc_$y_level, levels = levels)
+    
+    upperData <- perc_[perc_$y_level %in% utils::tail(levels, -1),]
+    lowerData <- perc_[perc_$y_level %in% utils::head(levels, -1),]
+    upperData <- .renameColumns(upperData, c("y_level", "perc_values"), c("upper_perc", "upper_perc_value"))
+    lowerData <- .renameColumns(lowerData, c("y_level", "perc_values"), c("lower_perc", "lower_perc_value"))
+    bandsData <- upperData
+    bandsData$lower_perc <- lowerData$lower_perc
+    bandsData$lower_perc_value <- lowerData$lower_perc_value
+    bandsData$bin <- as.numeric(as.character(bandsData$bin))
+    
+    bin <- lower_perc_value <- upper_perc_value <- upper_perc <- NULL
+    p <- ggplotmlx()
+    p <- p + geom_ribbon(data = bandsData,
+                         aes(x = bin, ymin = lower_perc_value,
+                             ymax = upper_perc_value, fill = upper_perc))
+    
+    p <- p  +  xlab("time") + ylab("probability") + ylim(c(0,1)) + sfm
+    
+    if (facet == T) {
+      if (length(group) == 1) {
+        p <- p + facet_wrap(group)
+      } else if (length(group) == 2) { 
+        p <- p + facet_grid(paste(group[1], "~", group[2]))
+      } else if (length(group) > 2) {
+        p <- p + facet_wrap(stats::as.formula(paste(".~", paste(group, collapse = " + "))))
       }
-      datapoly <- rbind( datapoly, dk)
-      pk <- pk + geom_polygon(data=dk, aes(x=x, y=pr,fill=v, group=v)) 
     }
-    
-    pk <- pk  +  xlab("time")+ylab("probability")+ylim(c(0,1)) + sfm
-    # pk <- ggplotmlx(datapoly) + geom_polygon(aes(x=x, y=pr,fill=v, group=v)) +
-    #   xlab("time")+ylab("probability")+ylim(c(0,1)) +sfm
-     
-    if (facet==TRUE) {
-    if (length(group)==1) 
-      pk <- pk + facet_wrap(group)
-    if (length(group)==2) 
-      pk <- pk + facet_grid(paste(group[1],"~",group[2]))
-    }
-    res <- pk
-    
+    res <- p
   } else {
-    dy <- NULL
-    for (k in (1:ng)) {
-      tyk <- as.data.frame(cbind(round(t,digits=6),t(y[[k]])))
-      if (!is.null(group)) {
-        tyk[group] <- r[group][jk[1],]
-        jk <- which(ig==ug[k])
-        }
-      dy=rbind(dy, tyk)
-    }
-    names(dy)=c("time", "baseline",y.levels)
-    res <- list(color=color,y=dy)
+    res <- list(color=color, y=.renameColumns(perc, "bin", "time"))
   }
   return(res)
 }  

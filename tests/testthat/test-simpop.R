@@ -173,4 +173,9 @@ test_that("If one seed specified, 2 iterations of the function give the same res
 })
 
 
-
+test_that("n = 1", {
+  project <- file.path(demo_path, "1.creating_and_using_models",
+                       "1.1.libraries_of_models", "theophylline_project.mlxtran")
+  expect_error(simpopmlx(project=project, n = 10), NA)
+  expect_error(simpopmlx(project=project, n = 1), NA)
+})

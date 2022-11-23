@@ -407,8 +407,7 @@ kmplotmlx  <-  function(r, index=1, level=NULL, time=NULL, cens=TRUE, plot=TRUE,
       
       
     } else {
-      cat("\nindex should be an integer of the string 'numberEvent'\n")
-      return()
+      stop("index should be an integer of the string 'numberEvent'", call. = FALSE)
     }
     
     Dk <- data.frame(time=T,S)

@@ -84,7 +84,7 @@
 #' f   <- list(f1, f2)
 #' 
 #' shinymlx(model=PKPDmodel, treatment=adm, parameter=list(p1,p2), output=f,
-#'          style="dashboard1")
+#'          style="dashboard1", appname=tempdir())
 #' 
 #' #------------------------------------------------------------------------
 #' p1 <- list(
@@ -100,12 +100,12 @@
 #' )
 #' s <- list(select.x=FALSE, select.y=FALSE)
 #' shinymlx(model=PKPDmodel, treatment=adm, parameter=list(p1,p2), output=f, 
-#'          style="navbar1", settings=s)
+#'          style="navbar1", settings=s, appname=tempdir())
 #' }
 #' @importFrom utils read.csv
 #' @export         
 shinymlx <- function(model,parameter=NULL,output=NULL,treatment=NULL,regressor=NULL,
-                     group=NULL, data=NULL,appname="shinymlxApp",style="basic",
+                     group=NULL, data=NULL,appname,style="basic",
                      settings=NULL,title=" ")
 {
   select=list()
@@ -122,7 +122,7 @@ shinymlx <- function(model,parameter=NULL,output=NULL,treatment=NULL,regressor=N
   
   s2r <- ""
   s2f <- ""
-  unlink(file.path(mainDir=appname), recursive = TRUE, force = TRUE)
+  # unlink(file.path(mainDir=appname), recursive = TRUE, force = TRUE)
   dir.create(file.path(mainDir=appname), showWarnings = FALSE)
   save(regressor, group, file=file.path(appname,"data.RData"))
   if (is.list(model)) {

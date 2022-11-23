@@ -121,7 +121,7 @@
 #' @param npop deprecated, Set parameter = "mlx_popUncertainSA" or "mlx_popUncertainLin" instead.
 #' @param fim deprecated, Set parameter = "mlx_popUncertainSA" or "mlx_popUncertainLin" instead.
 #' @param result.file deprecated
-#' @param saveSmlxProject If specified, smlx project will be save in th path location
+#' @param saveSmlxProject If specified, smlx project will be save in the path location
 #' (by default smlx project is not saved)
 #' @param settings a list of optional settings
 #' \itemize{
@@ -132,6 +132,7 @@
 #'   \item \code{samplingMethod}: str, Sampling method used for the simulation. One of "keepOrder", "withReplacement", "withoutReplacement"
 #'   (default "keepOrder")
 #'   \item \code{out.trt} : TRUE/FALSE (default = TRUE) output of simulx includes treatment
+#'   \item \code{out.reg} : TRUE/FALSE (default = TRUE) output of simulx includes regressors
 #'   \item \code{sharedIds}: Vector of Elements that share ids. Available types are "covariate", "output",
 #'   "treatment", "regressor", "population", "individual" (default c())
 #'   \item \code{sameIndividualsAmongGroups}: boolean, if True same individuals will be simulated among all groups
@@ -192,8 +193,8 @@
 #'
 #' @importFrom stats runif
 #' @importFrom utils read.table
+#' @importFrom gridExtra grid.arrange
 #' @export
-
 simulx <- function(model=NULL, parameter=NULL, covariate=NULL, output=NULL,
                    treatment=NULL, regressor=NULL, occasion=NULL, varlevel=NULL,
                    group=NULL, project=NULL, nrep=1, npop=NULL, fim=NULL,
@@ -267,7 +268,7 @@ simulx <- function(model=NULL, parameter=NULL, covariate=NULL, output=NULL,
   .check_in_vector(
     names(settings), "settings",
     c("seed", "kw.max", "sep", "digits", "replacement", "samplingMethod", "out.trt",
-      "id.out", "sameIndividualsAmongGroups", "sharedIds", "exportData")
+      "out.reg", "id.out", "sameIndividualsAmongGroups", "sharedIds", "exportData")
   )
   settings <- .initsimulxSettings(settings)
 
@@ -633,15 +634,6 @@ simulx <- function(model=NULL, parameter=NULL, covariate=NULL, output=NULL,
   # Manage the settings
   #=============================================================================
   # shared ids
-  settings$sharedIds <- .checkSharedIds(
-    settings$sharedIds,
-    sharedElements=list(covariate=covariate,
-                        output=output,
-                        treatment=treatment,
-                        regressor=regressor,
-                        population=.filterParameter(parameter, "pop"),
-                        individual=.filterParameter(parameter, "ind"))
-  )
   if (!is.null(settings$sharedIds)) {
     .lixoftCall("setSharedIds", list(settings$sharedIds))
   }
@@ -757,6 +749,19 @@ simulx <- function(model=NULL, parameter=NULL, covariate=NULL, output=NULL,
       simOut$treatment <- treat
     }
   }
+  
+  # Manage regressor Output in results ----------------------------------------
+  if (settings[['out.reg']]) {
+    regFile <- file.path(.lixoftCall("getProjectSettings")$directory, '/Simulation/regressors.txt')
+    if (file.exists(regFile)) {
+      regressors <- read.table(file=regFile, header=T, sep=.getDelimiter(regFile))
+
+      # factor rep id group cens pop & remove unused columns
+      regressors <- .postProcessDataFrames(regressors, force = settings[["id.out"]])
+      
+      simOut$regressors <- regressors
+    }
+  }
 
   # Manage population Output in results ----------------------------------------
   if (!is.null(nrep)) {
@@ -785,7 +790,7 @@ simulx <- function(model=NULL, parameter=NULL, covariate=NULL, output=NULL,
 
   # Write data -----------------------------------------------------------------
   if (!is.null(saveSmlxProject)) {
-    # .lixoftCall("setProjectSettings", list(list(userfilesnexttoproject=T)))
+    .lixoftCall("setProjectSettings", list(list(userfilesnexttoproject=T)))
     .lixoftCall("saveProject", list(saveSmlxProject))
   }
 
@@ -830,6 +835,7 @@ simulx <- function(model=NULL, parameter=NULL, covariate=NULL, output=NULL,
   if (!is.element("replacement", names(settings))) settings[['replacement']] <- F
   if (!is.element("samplingMethod", names(settings))) settings[['samplingMethod']] <- "keepOrder"
   if (!is.element("out.trt", names(settings))) settings[['out.trt']] <- T
+  if (!is.element("out.reg", names(settings))) settings[['out.reg']] <- T
   if (!is.element("id.out", names(settings))) settings[['id.out']] <- F
   if (!is.element("sharedIds", names(settings))) settings[["sharedIds"]] <- c()
   if (!is.element("sameIndividualsAmongGroups", names(settings))) settings[["sameIndividualsAmongGroups"]] <- F
@@ -840,6 +846,7 @@ simulx <- function(model=NULL, parameter=NULL, covariate=NULL, output=NULL,
   .check_bool(settings$replacement, "setting replacement")
   .check_in_vector(settings$samplingMethod, "setting samplingMethod", c("keepOrder", "withReplacement", "withoutReplacement"))
   .check_bool(settings$out.trt, "setting out.trt")
+  .check_bool(settings$out.reg, "setting out.reg")
   .check_bool(settings$id.out, "setting id.out")
   .check_in_vector(settings$sharedIds, "setting sharedIds",
                    c("covariate", "output", "treatment", "regressor", "population", "individual"))

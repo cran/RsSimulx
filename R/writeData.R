@@ -7,8 +7,7 @@
 #' 
 #' @param project (\emph{string}) a simulx project. 
 #' If no project specified, the function will run on the project that is already loaded.
-#' @param filename (\emph{string}) (\emph{optional}) file path to dataset.
-#' (default "simulated_dataset.csv")
+#' @param filename (\emph{string}) file path to dataset.
 #' In case of multiple replicates, the function creates one dataset per replicate with name $filename_repi
 #' If filename contains an extension, it must be "csv" or "txt". If it does not, extension is defined by `ext` argument.
 #' @param sep (\emph{string}) (\emph{optional}) Separator used to write dataset file. (default ",")
@@ -28,21 +27,18 @@
 #'   # Groups have the same number of individuals, population parameters,
 #'   # distribution of covariates and outputs.
 #'   
-#'   # In this example we write data in the home directory with the name demo_simulx
+#'   # In this example we write data in a temp directory with the name demo_simulx
 #'   # and a txt extension
-#'   writeData("rssimulxDemo.smlx", filename = "demo_simulx", ext = "txt")
+#'   writeData("rssimulxDemo.smlx", filename = tempfile(), ext = "txt")
 #'   
 #' } 
-writeData <- function(project = NULL, filename = "simulated_dataset.csv",
+writeData <- function(project = NULL, filename,
                       sep = ",", ext = "csv", nbdigits = 5) {
   # connectors
   if (!initRsSimulx()$status) {
     return()
   }
 
-  if (is.null(filename)) {
-    filename = "simulated_dataset.csv"
-  }
   if (! is.null(.getFileExt(filename))) {
     ext <- .getFileExt(filename)
   }

@@ -12,7 +12,7 @@ shinymlx(
   regressor = NULL,
   group = NULL,
   data = NULL,
-  appname = "shinymlxApp",
+  appname,
   style = "basic",
   settings = NULL,
   title = " "
@@ -117,7 +117,7 @@ f2  <- list(name = 'E', time = seq(0, 250, by=1))
 f   <- list(f1, f2)
 
 shinymlx(model=PKPDmodel, treatment=adm, parameter=list(p1,p2), output=f,
-         style="dashboard1")
+         style="dashboard1", appname=tempdir())
 
 #------------------------------------------------------------------------
 p1 <- list(
@@ -133,6 +133,6 @@ adm <- list(
 )
 s <- list(select.x=FALSE, select.y=FALSE)
 shinymlx(model=PKPDmodel, treatment=adm, parameter=list(p1,p2), output=f, 
-         style="navbar1", settings=s)
+         style="navbar1", settings=s, appname=tempdir())
 }
 }

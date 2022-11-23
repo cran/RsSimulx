@@ -70,7 +70,7 @@ catplotmlx <- function(r, col=NULL, breaks=NULL, plot=TRUE, color="#194280",
     stop("input of catplotmlx is empty!", call.=FALSE)
   
   r.names <- names(r)
-  
+
   if (is.null(col)) {
     col <- c(
       ifelse(any(r.names=="id"), which(r.names=="id"), 1),
@@ -78,7 +78,7 @@ catplotmlx <- function(r, col=NULL, breaks=NULL, plot=TRUE, color="#194280",
       ifelse(!is.null(attr(r,"name")), max(which(r.names==attr(r,"name"))), 3)
     )
   }
-  
+
   if (is.null(group)) {
     if ("group" %in% names(r)) {
       group <- "group"

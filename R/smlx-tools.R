@@ -1230,26 +1230,40 @@ inlineDataFrame <- function(str){
   if (is.null(parameter)) {
     return(parameter)
   }
+  if (length(parameter) == 1 && is.null(names(parameter))) {
+    return(parameter[[1]])
+  }
+  if (is.string(parameter)) {
+    return(parameter)
+  }
 
   # if parameter is a list of parameters list: we concatenate lists
   if (.is_list_or_named_vector(parameter)) {
+    for (i in seq_along(parameter)) {
+      p <- parameter[[i]]
+      if (is.string(p)) {
+        if (file.exists(p)) {
+          .checkExtension(.getFileExt(p), "parameter file extension")
+          parameter[[i]] <- utils::read.table(file=p, header=T, sep=.getDelimiter(p))
+        } else {
+          warning("When a list of parameters is specified, string can only be used for dataframe path. ",
+                  "Parameter ", p, " will be ignored.", call.=F)
+          parameter[i] <- list(NULL)
+        }
+      }
+    }
+
     # remove NULL in list
     parameter[sapply(parameter, is.null)] <- NULL
     if (length(parameter) == 0) {
       return(NULL)
     }
-    for (i in seq_along(parameter)) {
-      p <- parameter[[i]]
-      if (is.string(p) && file.exists(p)) {
-        .checkExtension(.getFileExt(p), "parameter file extension")
-        parameter[[i]] <- utils::read.table(file=p, header=T, sep=.getDelimiter(p))
-      }
-    }
+
     if (all(sapply(parameter, .is_list_or_named_vector))) {
       parameter <- .mergeParameter(parameter)
     }
   }
-  
+
   return(parameter)
 }
 

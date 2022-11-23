@@ -249,6 +249,13 @@
 .checkUnitaryTreatment<- function(treatment, listName = "treatment"){
   mandatoryNames <- c("time", "amount")
   defaultNames <- c("tinf", "rate", "type", "repeats", "probaMissDose", "washout")
+  
+  # replace adm name by type
+  names(treatment)[names(treatment) == "adm"] <- "type"
+  
+  # replace amt by amount
+  names(treatment)[names(treatment) == "amt"] <- "amount"
+  
   if (is.data.frame(treatment)) {
     # add id as mandatory name if data is a dataframe
     indexID <- which(names(treatment) == 'id')
@@ -257,12 +264,6 @@
     # defaultNames <- setdiff(defaultNames, c("repeats"))
     defaultNames <- names(treatment)
   }
-
-  # replace adm name by type
-  names(treatment)[names(treatment) == "adm"] <- "type"
-  
-  # replace amt by amount
-  names(treatment)[names(treatment) == "amt"] <- "amount"
   
   # error if target in treatment
   if (is.element("target", names(treatment))) {
@@ -971,7 +972,7 @@
 .check_strict_pos_integer <- function(int, argname) {
   if(!(is.double(int)||is.integer(int)))
     stop("Invalid ", argname, ". It must be a strictly positive integer.", call. = F)
-  if ((int <= 0) || (!as.integer(int) == int))
+  if (any(int <= 0) || any(!as.integer(int) == int))
     stop("Invalid ", argname, ". It must be a strictly positive integer.", call. = F)
   return(int)
 }
@@ -980,7 +981,7 @@
 .check_pos_integer <- function(int, argname) {
   if(!(is.double(int)||is.integer(int)))
     stop("Invalid ", argname, ". It must be a positive integer.", call. = F)
-  if ((int < 0) || (!as.integer(int) == int))
+  if (any(int < 0) || any(!as.integer(int) == int))
     stop("Invalid ", argname, ". It must be a positive integer.", call. = F)
   return(int)
 }
@@ -1001,28 +1002,28 @@
 
 # Checks if an input is a positive double and returns an error --------
 .check_pos_double <- function(d, argname) {
-  if(!(is.double(d)||is.integer(d)) || (d < 0))
+  if(!(is.double(d)||is.integer(d)) || any(d < 0))
     stop("Invalid ", argname, ". It must be a positive double.", call. = F)
   return(d)
 }
 
 # check if a vector contains only positive doubles
 .check_vector_of_pos_double <- function(v, argname) {
-  if(!(is.double(v)||is.integer(v)) || (v < 0))
+  if(!(is.double(v)||is.integer(v)) || any(v < 0))
     stop("Invalid ", argname, ". It must be a vector of positive doubles.", call. = F)
   return(v)
 }
 
 # Checks if an input is a strictly positive double and returns an error --------
 .check_strict_pos_double <- function(d, argname) {
-  if(!(is.double(d)||is.integer(d)) || (d <= 0))
+  if(!(is.double(d)||is.integer(d)) || any(d <= 0))
     stop("Invalid ", argname, ". It must be a strictly positive double.", call. = F)
   return(d)
 }
 
 # check if a vector contains only strictly positive doubles
 .check_vector_of_strict_pos_double <- function(v, argname) {
-  if(!(is.double(v)||is.integer(v)) || (v <= 0))
+  if(!(is.double(v)||is.integer(v)) || any(v <= 0))
     stop("Invalid ", argname, ". It must be a vector of strictly positive doubles.", call. = F)
   return(v)
 }

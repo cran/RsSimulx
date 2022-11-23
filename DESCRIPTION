@@ -1,12 +1,11 @@
 Package: RsSimulx
 Type: Package
-Title: R Speaks 'Simulx'
-Version: 2.0.0
+Title: Extension of 'lixoftConnectors' for 'Simulx'
+Version: 2.0.2
 Authors@R: 
     c(person(given = "Clemence",
              family = "Pinaud",
-             role = c("aut", "cre"),
-             email = "clemence.pinaud@lixoft.com"),
+             role = "aut"),
       person(given = "Jonathan",
              family = "Chauvin",
              role = "aut",
@@ -14,9 +13,13 @@ Authors@R:
       person(given = "Marc",
              family = "Lavielle",
              role = "ctb",
-             email = "Marc.Lavielle@inria.fr"))
-Maintainer: Clemence Pinaud <clemence.pinaud@lixoft.com>
-Description: Provide useful tools which supplement the use of Simulx software and R connectors (Monolix Suite). 'Simulx' is an easy, efficient and flexible application for clinical trial simulations. You need 'Simulx' software to be installed in order to use 'RsSimulx' package. Among others tasks, 'RsSimulx' provides the same functions as package 'mlxR' does with a compatibility with 'Simulx' software.
+             email = "Marc.Lavielle@inria.fr"),
+      person(given = "Frano",
+             family = "Mihaljevic",
+             role = c("aut", "cre"),
+             email = "support@lixoft.com"))
+Maintainer: Frano Mihaljevic <support@lixoft.com>
+Description: Provides useful tools which supplement the use of 'Simulx' software and 'R' connectors ('Monolix Suite'). 'Simulx' is an easy, efficient and flexible application for clinical trial simulations. You need 'Simulx' software to be installed in order to use 'RsSimulx' package. Among others tasks, 'RsSimulx' provides the same functions as package 'mlxR' does with a compatibility with 'Simulx' software.
 SystemRequirements: 'Simulx' (<http://simulx.lixoft.com/>)
 Depends: R (>= 3.0.0), ggplot2
 Imports: gridExtra, utils, stats, grDevices
@@ -28,12 +31,13 @@ Collate: catplotmlx.R ggplotmlx.R kmplotmlx.R prctilemlx.R simulxR.R
 LazyData: true
 License: BSD_2_clause + file LICENSE
 Copyright: LIXOFT
-RoxygenNote: 7.1.1.9000
+RoxygenNote: 7.2.1
 Suggests: testthat
 NeedsCompilation: no
-Packaged: 2022-02-18 09:29:42 UTC; clemence
-Author: Clemence Pinaud [aut, cre],
+Packaged: 2022-11-22 14:31:25 UTC; FranoMihaljevic
+Author: Clemence Pinaud [aut],
   Jonathan Chauvin [aut],
-  Marc Lavielle [ctb]
+  Marc Lavielle [ctb],
+  Frano Mihaljevic [aut, cre]
 Repository: CRAN
-Date/Publication: 2022-02-18 14:00:02 UTC
+Date/Publication: 2022-11-23 11:50:05 UTC

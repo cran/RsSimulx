@@ -136,7 +136,7 @@ One of the following mlx covariate elements: "mlx_Cov" and "mlx_CovDist"
 
 \item{fim}{deprecated, Set parameter = "mlx_popUncertainSA" or "mlx_popUncertainLin" instead.}
 
-\item{saveSmlxProject}{If specified, smlx project will be save in th path location
+\item{saveSmlxProject}{If specified, smlx project will be save in the path location
 (by default smlx project is not saved)}
 
 \item{result.file}{deprecated}
@@ -157,6 +157,7 @@ You only need to specify a formula. The additional lines will be added in a new 
 \item \code{samplingMethod}: str, Sampling method used for the simulation. One of "keepOrder", "withReplacement", "withoutReplacement"
 (default "keepOrder")
 \item \code{out.trt} : TRUE/FALSE (default = TRUE) output of simulx includes treatment
+\item \code{out.reg} : TRUE/FALSE (default = TRUE) output of simulx includes regressors
 \item \code{sharedIds}: Vector of Elements that share ids. Available types are "covariate", "output",
 "treatment", "regressor", "population", "individual" (default c())
 \item \code{sameIndividualsAmongGroups}: boolean, if True same individuals will be simulated among all groups

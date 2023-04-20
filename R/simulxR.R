@@ -254,7 +254,6 @@ simulx <- function(model=NULL, parameter=NULL, covariate=NULL, output=NULL,
   # Model file -----------------------------------------------------------------
   nbID <- 1
   if(!is.null(model)){
-    model <- .getModelFile(model)
     .checkModel(fileName = model)
   }
   # set_options(warnings = FALSE)
@@ -453,7 +452,7 @@ simulx <- function(model=NULL, parameter=NULL, covariate=NULL, output=NULL,
     }
 
     # create project with monolix project
-    .lixoftCall("importMonolixProject", list(projectFile = project))
+    .lixoftCall("importProject", list(projectFile = project))
 
     sharedGroupName <- .lixoftCall("getGroups")[[1]]$name
 

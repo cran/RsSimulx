@@ -92,24 +92,6 @@ inlineDataFrame <- function(str){
   return(df)
 }
 
-
-# get model file from model library
-.getModelFile <- function(model) {
-  if (!grepl( "^lib:", model)) return(model)
-  lixoftPath <- .lixoftCall("getLixoftConnectorsState", list(quietly = TRUE))$path
-  libPath <- file.path(lixoftPath, "factory", "library")
-  models <- list.files(
-    path = libPath,
-    pattern = paste0("*", gsub("^lib:", "", model)),
-    recursive = TRUE
-  )
-  if (length(models) == 0) {
-    stop("Invalid model ", model, ". It is not in the model library.", call. = FALSE)
-  }
-  model <- file.path(libPath, models[1])
-  return(model)
-}
-
 #*******************************************************************************
 # OUTPUT MANAGEMENT
 #*******************************************************************************
@@ -1148,7 +1130,11 @@ inlineDataFrame <- function(str){
 .getModelSection <- function(modelFile, section, block = NULL) {
   sections <- c("[LONGITUDINAL]", "[INDIVIDUAL]", "[COVARIATE]", "[POPULATION]")
   blocks <- c("DESCRIPTION:", "PK:", "EQUATION:", "DEFINITION:", "OUTPUT:")
-  l <- readLines(modelFile, warn=FALSE)
+  if (grepl("^lib:", modelFile)) {
+    l <- .lixoftCall("getLibraryModelContent", args = list(filename = modelFile, print = FALSE))
+  } else {
+    l <- readLines(modelFile, warn=FALSE)
+  }
 
   if (!grepl("^[[a-zA-z]*]$", section, perl = TRUE)) {
     section <- paste0("[", section, "]")

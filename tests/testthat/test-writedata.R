@@ -1,7 +1,7 @@
-context("Write data")
-
 skip_on_cran()
 skip_if_not_installed("lixoftConnectors")
+
+skip("Takes a long time")
 
 initRsSimulx()
 
@@ -12,7 +12,7 @@ get_project <- function(project) {
   return(tmpProject)
 }
 demo_path <- file.path(path.expand("~"), "lixoft", "simulx",
-                       paste0("simulx", .lixoftCall("getLixoftConnectorsState")$version), "demos")
+                           paste0("simulx", .lixoftCall("getLixoftConnectorsState")$version), "demos")
 mlx_demo_path <- file.path(path.expand("~"), "lixoft", "monolix",
                            paste0("monolix", .lixoftCall("getLixoftConnectorsState")$version), "demos")
 

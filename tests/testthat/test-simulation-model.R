@@ -160,6 +160,7 @@ test_that("treatment input of simulx", {
   )
   out_treatment <- data.frame(
     id = rep(1:3, each = 4),
+    original_id = rep(1:3, each = 4),
     time=rep(c(0, 7, 12, 14), by = 3),
     amount = rep(c(20, 50, 100), each = 4),
     admtype = 1,
@@ -180,7 +181,7 @@ test_that("treatment input of simulx", {
                                parameter = param,
                                output = out,
                                treatment = treatment),
-                 "Some columns have been ignored in treatment data : 'id'"
+                 "^Some columns have been ignored in .* : 'id'\n$"
   )
 })
 
@@ -204,6 +205,7 @@ test_that("treatment input of simulx : administration type", {
                 parameter = param,
                 output = out,
                 treatment = trt)
+  sim$treatment$original_id <- NULL
   expect_equal(sim$treatment, out_treatment)
   
   trt <- data.frame(id=rep(1:3, each=2),
@@ -220,6 +222,7 @@ test_that("treatment input of simulx : administration type", {
                 parameter = param,
                 output = out,
                 treatment = trt)
+  sim$treatment$original_id <- NULL
   expect_equal(sim$treatment, out_treatment)
   
   sim <- simulx(model = model,
@@ -264,6 +267,7 @@ test_that("treatment input of simulx : proba miss dose", {
                 parameter = param,
                 output = out,
                 treatment = trt)
+  sim$treatment$original_id <- NULL
   expect_equal(sim$treatment, out_treatment)
   
   sim <- simulx(model = model,
@@ -309,7 +313,7 @@ test_that("treatment input of simulx : repeat", {
                   parameter = param,
                   output = out,
                   treatment = trt),
-    "^Some columns have been ignored in treatment data"
+    "^Some columns have been ignored in .* : 'repeats'\n$"
   )
 
   expect_error(
@@ -548,11 +552,13 @@ y2 = {distribution=normal, prediction=PD, errorModel=proportional(b2)}")
   expect_equal(res1$population, param)
   expect_equal(res1$parameter[c("id", "WT")], out_cov)
   expect_length(unique(res1$Cc$id), N)
+  res1$treatment$original_id <- NULL
   expect_equal(res1$treatment, out_trt)
   
   expect_equal(res2$population, param)
   expect_equal(res2$parameter[c("id", "WT")], out_cov)
   expect_length(unique(res2$Cc$id), N)
+  res2$treatment$original_id <- NULL
   expect_equal(res2$treatment, out_trt)
   
 

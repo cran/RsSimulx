@@ -1,7 +1,7 @@
 Package: RsSimulx
 Type: Package
 Title: Extension of 'lixoftConnectors' for 'Simulx'
-Version: 2.0.2
+Version: 2023.1
 Authors@R: 
     c(person(given = "Clemence",
              family = "Pinaud",
@@ -31,13 +31,14 @@ Collate: catplotmlx.R ggplotmlx.R kmplotmlx.R prctilemlx.R simulxR.R
 LazyData: true
 License: BSD_2_clause + file LICENSE
 Copyright: LIXOFT
-RoxygenNote: 7.2.1
-Suggests: testthat
+RoxygenNote: 7.2.3
+Suggests: testthat (>= 3.0.0)
+Config/testthat/edition: 3
 NeedsCompilation: no
-Packaged: 2022-11-22 14:31:25 UTC; FranoMihaljevic
+Packaged: 2023-04-18 12:57:07 UTC; FranoMihaljevic
 Author: Clemence Pinaud [aut],
   Jonathan Chauvin [aut],
   Marc Lavielle [ctb],
   Frano Mihaljevic [aut, cre]
 Repository: CRAN
-Date/Publication: 2022-11-23 11:50:05 UTC
+Date/Publication: 2023-04-20 10:00:02 UTC

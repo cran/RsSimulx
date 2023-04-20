@@ -63,7 +63,11 @@
 # Check if the model file contains an OUTPUT: section
 ##############################################################################"
 .checkModelOutputSection <- function(fileName){
-  lines <- suppressWarnings(readLines(con = fileName, n = -1))
+  if (grepl("^lib:", fileName)) {
+    lines <- .lixoftCall("getLibraryModelContent", args = list(filename = fileName, print = FALSE))
+  } else {
+    lines <- suppressWarnings(readLines(con = fileName, n = -1))
+  }
   bIsOUT = F
   for(index in 1: length(lines)){
     bIsOUT <- bIsOUT|grepl(x =lines[index], pattern = 'OUTPUT:')
@@ -953,6 +957,7 @@
 
 # Checks if a file exists and returns an error----------------------------------
 .check_file <- function(filename, fileType = "File") {
+  if (grepl("^lib:", filename)) return(filename)
   if (!file.exists(filename))
     stop(fileType, " ", filename, " does not exist.", call. = FALSE)
   filename <- normalizePath(filename)

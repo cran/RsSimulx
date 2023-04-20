@@ -1,5 +1,3 @@
-context("Simulx")
-
 skip_on_cran()
 skip_if_not_installed("lixoftConnectors")
 
@@ -699,12 +697,12 @@ test_that("No error when cat cov defined as T / F", {
   expect_equal(unique(res$parameter$SEX), "F")
 })
 
-test_that("Model form library", {
+test_that("Model from library", {
   model <- "lib:oral1_1cpt_TlagkaVCl.txt"
   expect_error(expect_warning(simulx(model)), NA)
   
   model <- "lib:oral1_1cpt_Tlagka.txt"
-  expect_error(expect_warning(simulx(model)), "^Invalid model")
+  expect_error(expect_warning(simulx(model)), "is not a model from the libraries\n$")
   
 })
 
@@ -762,40 +760,6 @@ output = Cc"
     "setting sharedIds must be in \\{'covariate', 'output', 'treatment', 'regressor', 'population', 'individual'\\}."
   )
 
-  expect_warning(
-    simulx(
-      model=model,
-      parameter=popparams1,
-      covariate=cov1,
-      treatment=trt1,
-      output=output1,
-      settings=list(sharedIds=c("population", "treatment"))),
-    "^No id to share"
-  )
-  
-  expect_warning(
-    simulx(
-      model=model,
-      parameter=popparams1,
-      covariate=cov1,
-      treatment=trt1,
-      output=output2,
-      settings=list(sharedIds=c("output", "treatment"))),
-    "^No id to share"
-  )
-
-  expect_warning(
-    simulx(
-      model=model,
-      parameter=popparams1,
-      covariate=cov1,
-      treatment=trt2,
-      output=output2,
-      settings=list(sharedIds=c("covariate", "output", "treatment"))),
-    "^No id to share"
-  )
-  expect_equal(.lixoftCall("getSharedIds"), c("treatment", "output"))
-  
   res <- simulx(
     model=model,
     parameter=popparams1,
@@ -873,39 +837,39 @@ output = Cc"
     "^setting sharedIds must be in"
   )
   
-  expect_warning(
-    simulx(
-      model=model,
-      parameter=popparams1,
-      covariate=cov1,
-      treatment=trt1,
-      output=output1,
-      settings=list(sharedIds=c("population", "treatment"))),
-    "^No id to share"
-  )
+  # expect_warning(
+  #   simulx(
+  #     model=model,
+  #     parameter=popparams1,
+  #     covariate=cov1,
+  #     treatment=trt1,
+  #     output=output1,
+  #     settings=list(sharedIds=c("population", "treatment"))),
+  #   "^No id to share"
+  # )
   
-  expect_warning(
-    simulx(
-      model=model,
-      parameter=popparams1,
-      covariate=cov1,
-      treatment=trt1,
-      output=output2,
-      settings=list(sharedIds=c("output", "treatment"))),
-    "^No id to share"
-  )
+  # expect_warning(
+  #   simulx(
+  #     model=model,
+  #     parameter=popparams1,
+  #     covariate=cov1,
+  #     treatment=trt1,
+  #     output=output2,
+  #     settings=list(sharedIds=c("output", "treatment"))),
+  #   "^No id to share"
+  # )
   
-  expect_warning(
-    simulx(
-      model=model,
-      parameter=popparams1,
-      covariate=cov1,
-      treatment=trt2,
-      output=output2,
-      settings=list(sharedIds=c("covariate", "output", "treatment"))),
-    "^No id to share"
-  )
-  expect_equal(.lixoftCall("getSharedIds"), c("treatment", "output"))
+  # expect_warning(
+  #   simulx(
+  #     model=model,
+  #     parameter=popparams1,
+  #     covariate=cov1,
+  #     treatment=trt2,
+  #     output=output2,
+  #     settings=list(sharedIds=c("covariate", "output", "treatment"))),
+  #   "^No id to share"
+  # )
+  # expect_equal(.lixoftCall("getSharedIds"), c("treatment", "output"))
   
   res <- simulx(
     model=model,
@@ -963,7 +927,7 @@ test_that("simulx save smlx project when saveSmlxProject is specified", {
   
   f5 <- paste0(tempfile(), ".smlx")
   res <- simulx(project=project, saveSmlxProject=f5, settings=list(exportData=T))
-  expect_true(file.exists(file.path(.lixoftCall("getProjectSettings")$directory, "Simulation", "simulatedData.txt")))
+  expect_true(file.exists(file.path(.lixoftCall("getProjectSettings")$directory, "Simulation", "simulatedData.csv")))
 
 })
 
@@ -979,10 +943,12 @@ test_that("Parameter argument", {
   parameter=data.frame(id=c(1, 2, 3), Tlag=c(23, 24, 30), ka=c(4, 3, 2), V=c(30, 40, 50), Cl=c(3, 2, 1))
   parameter$id <- factor(parameter$id)
   res <- simulx(model=model, parameter=parameter, output=output)
+  res$parameter$original_id <- NULL
   expect_equal(res$parameter, parameter[names(res$parameter)])
 
   parameter_file=.addDataFrameTemp(parameter)
   res <- simulx(model=model, parameter=parameter_file, output=output)
+  res$parameter$original_id <- NULL
   expect_equal(res$parameter, parameter[names(res$parameter)])
 
 })
@@ -1074,13 +1040,17 @@ test_that("Treatment argument", {
   row.names(out_2) <- NULL
   res1 <- simulx(model=model, treatment=treatment1, output=output, parameter=p)
   res2 <- simulx(model=model, treatment=list(treatment1, treatment2), output=output, parameter=p)
+  res1$treatment$original_id <- NULL
   expect_equal(res1$treatment, out_treatment1)
+  res2$treatment$original_id <- NULL
   expect_equal(res2$treatment, out_2)
 
   treatment1_file <- .addDataFrameTemp(treatment1)
   treatment2_file <- .addDataFrameTemp(treatment2)
   res1 <- simulx(model=model, treatment=treatment1_file, output=output, parameter=p)
+  res1$treatment$original_id <- NULL
   res2 <- simulx(model=model, treatment=list(treatment1_file, treatment2_file), output=output, parameter=p)
+  res2$treatment$original_id <- NULL
   expect_equal(res1$treatment, out_treatment1)
   expect_equal(res2$treatment, out_2)
   
@@ -1380,8 +1350,9 @@ test_that("Treatment and outputs elements when overlapping occasions", {
 test_that("Regressor argument", {
   model <- inlineModel(
 "[LONGITUDINAL]
-input = {parameter = {Emax, EC50}, 
-         regressor = {C} }
+input = {Emax, EC50, C} 
+C = {use = regressor}
+
 EQUATION:
 E = Emax*C/(C+EC50)"
   )
@@ -1424,8 +1395,10 @@ E = Emax*C/(C+EC50)"
   
   model <- inlineModel(
 "[LONGITUDINAL]
-input = {parameter = {k1, k2, f0, g0}, 
-         regressor = {x1, x2} }
+input = {k1, k2, f0, g0, x1, x2}
+x1 = {use = regressor}
+x2 = {use = regressor}
+
 EQUATION:
 t0  = 0
 f_0 = f0

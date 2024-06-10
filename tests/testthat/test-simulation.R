@@ -3,16 +3,13 @@ skip_if_not_installed("lixoftConnectors")
 
 
 initRsSimulx()
-demo_path <- file.path(path.expand("~"), "lixoft", "monolix",
-                       paste0("monolix", .lixoftCall("getLixoftConnectorsState")$version), "demos")
+demo_path <- gsub("simulx", "monolix", .lixoftCall("getDemoPath"), fixed = TRUE)
 skip_if(!dir.exists(demo_path), message = NULL)
 
-get_project <- function(project) {
-  .loadProject(project, software = "monolix")
-  tmpProject <- file.path(tempdir(), basename(project))
-  .lixoftCall("saveProject", list(projectFile = tmpProject))
-  return(tmpProject)
-}
+project <- file.path(demo_path, "1.creating_and_using_models",
+                     "1.1.libraries_of_models", "theophylline_project.mlxtran")
+project <- get_project(project, runStdErrorsIfNeed = TRUE)
+initRsSimulx(force = TRUE)
 
 # test_that("simulxR runs on simulx demo with no fail", {
 #   files <- list.files(path = demo_path , pattern = '[.]mlxtran$', full.names = T, include.dirs = F, recursive = T)
@@ -21,25 +18,12 @@ get_project <- function(project) {
 #     print(f)
 #     project <- get_project(f)
 # 
-#     if (! .lixoftCall("getLaunchedTasks")[["populationParameterEstimation"]]) {
-#       .lixoftCall("runPopulationParameterEstimation")
-#     }
 #     initRsSimulx(force = TRUE)
 #     expect_error(simulx(project = project), NA)
 #   }
 # })
 
 test_that("Case studies and demos run with no fail", {
-  project <- file.path(demo_path, "1.creating_and_using_models",
-                       "1.1.libraries_of_models", "theophylline_project.mlxtran")
-  project <- get_project(project)
-  if (! .lixoftCall("getLaunchedTasks")[["populationParameterEstimation"]]) {
-    # .lixoftCall("runPopulationParameterEstimation")
-    .lixoftCall("runScenario")
-    
-  } 
-  initRsSimulx(force = TRUE)
-  
   expect_error(simulx(project = project), NA)
   expect_error(simulx(project = project,
                       output = list(name = 'Cc', time = seq(from = 0, to = 24, by = 1))),
@@ -99,24 +83,27 @@ test_that("Function stops when Invalid project", {
                "Project thisprojectdoesnorexist.mlxtran does not exist.")
   smlxpath <- file.path(path.expand("~"), "lixoft", "simulx",
                         paste0("simulx", .lixoftCall("getLixoftConnectorsState")$version), "demos")
-  smlxproject <- file.path(smlxpath, "/2.models/longitudinal.smlx")
+  smlxproject <- file.path(smlxpath, "2.models/longitudinal.smlx")
   expect_error(simulx(project = smlxproject),
-               "^Invalid project file.")
+               "does not exist.")
 })
 
 test_that("Function stops when Invalid model", {
-
+  pk.model <- inlineModel("
+  [LONGITUDINAL]
+  input = {V1, k}
+  EQUATION:
+  C = pkmodel(V,k)
+  ")
+  
+  C <- list(name='C', time=seq(0, 100, by=1))
+  p <- c(V=10, k=0.2)
+  adm <- list(time=seq(0,to=66,by=6), amount=50)
+  expect_error(res <- simulx(model = pk.model, parameter = p, output = C, treatment = adm),
+               "Parse error")
 })
 
 test_that("Function stops when a project and a modele are defined together", {
-  project <- file.path(demo_path, "1.creating_and_using_models",
-                       "1.1.libraries_of_models", "theophylline_project.mlxtran")
-  project <- get_project(project)
-  if (! .lixoftCall("getLaunchedTasks")[["populationParameterEstimation"]]) {
-    .lixoftCall("runPopulationParameterEstimation")
-  }
-  initRsSimulx(force = TRUE)
-  
   pk.model <- inlineModel("
   [LONGITUDINAL]
   input = {V, k}
@@ -137,13 +124,6 @@ test_that("Function stops when neither project nor modele is defined", {
 })
 
 test_that("Function stops when npop and nrep are not integers", {
-  project <- file.path(demo_path, "1.creating_and_using_models",
-                       "1.1.libraries_of_models", "theophylline_project.mlxtran")
-  project <- get_project(project)
-  if (! .lixoftCall("getLaunchedTasks")[["populationParameterEstimation"]]) {
-    .lixoftCall("runPopulationParameterEstimation")
-  }
-  initRsSimulx(force = TRUE)
   expect_error(simulx(project = project, nrep = 1.2),
                "^Invalid nrep.")
   expect_error(simulx(project =project, nrep = -3),
@@ -153,14 +133,6 @@ test_that("Function stops when npop and nrep are not integers", {
 })
 
 test_that("Deprecated arguments print message", {
-  project <- file.path(demo_path, "1.creating_and_using_models",
-                       "1.1.libraries_of_models", "theophylline_project.mlxtran")
-  project <- get_project(project)
-  if (! .lixoftCall("getLaunchedTasks")[["populationParameterEstimation"]]) {
-    .lixoftCall("runScenario")
-  }
-  initRsSimulx(force = TRUE)
-  
   expect_message(simulx(project = project, npop = 10))
   expect_message(simulx(project = project, fim = "SA"))
 })
@@ -240,14 +212,6 @@ w = {distribution = normal, mean = w_pop, sd = omega_w}"
 
 # Test settings ----------------------------------------------------------------
 test_that("When no seed specified: 2 simulations gives different results", {
-  project <- file.path(demo_path, "1.creating_and_using_models",
-                       "1.1.libraries_of_models", "theophylline_project.mlxtran")
-  project <- get_project(project)
-  if (! .lixoftCall("getLaunchedTasks")[["populationParameterEstimation"]]) {
-    .lixoftCall("runPopulationParameterEstimation")
-  }
-  initRsSimulx(force = TRUE)
-  
   res1 <- simulx(project = project)
   res2 <- simulx(project = project)
   expect_equal(names(res1), names(res2))
@@ -255,15 +219,6 @@ test_that("When no seed specified: 2 simulations gives different results", {
 })
 
 test_that("When a seed is specified: 2 simulations gives same results", {
-  project <- file.path(demo_path, "1.creating_and_using_models",
-                       "1.1.libraries_of_models", "theophylline_project.mlxtran")
-  project <- get_project(project)
-  if (! .lixoftCall("getLaunchedTasks")[["populationParameterEstimation"]]) {
-    .lixoftCall("runPopulationParameterEstimation")
-  }
-  .lixoftCall("runStandardErrorEstimation")
-  initRsSimulx(force = TRUE)
-  
   res1 <- simulx(project = project, settings = list(seed = 123))
   res2 <- simulx(project = project, settings = list(seed = 123))
   res3 <- simulx(project = project, npop = 2, settings = list(seed = 123))
@@ -360,14 +315,6 @@ test_that("When out.trt is FALSE, treatment is not included in ourput", {
 })
 
 test_that("When replacement is FALSE, simulx sampling method is keepOrder", {
-  project <- file.path(demo_path, "1.creating_and_using_models",
-                       "1.1.libraries_of_models", "theophylline_project.mlxtran")
-  project <- get_project(project)
-  if (! .lixoftCall("getLaunchedTasks")[["populationParameterEstimation"]]) {
-    .lixoftCall("runPopulationParameterEstimation")
-  }
-  initRsSimulx(force = TRUE)
-  
   res_keepOrder1 <- simulx(project = project, settings = list(seed=1234))
   expect_equal(lixoftConnectors::getSamplingMethod(), "keepOrder")
 
@@ -383,14 +330,6 @@ test_that("When replacement is FALSE, simulx sampling method is keepOrder", {
 })
 
 test_that("When replacement is TRUE, simulx sampling method is withReplacement", {
-  project <- file.path(demo_path, "1.creating_and_using_models",
-                       "1.1.libraries_of_models", "theophylline_project.mlxtran")
-  project <- get_project(project)
-  if (! .lixoftCall("getLaunchedTasks")[["populationParameterEstimation"]]) {
-    .lixoftCall("runPopulationParameterEstimation")
-  }
-  initRsSimulx(force = TRUE)
-  
   expect_message(res_replacement1 <- simulx(project = project, settings = list(replacement = TRUE, seed=1234)))
   expect_equal(lixoftConnectors::getSamplingMethod(), "withReplacement")
   
@@ -477,14 +416,6 @@ test_that("Output results contains the correct number of groups", {
 })
 
 test_that("Output results contains the correct number of rep", {
-  project <- file.path(demo_path, "1.creating_and_using_models",
-                       "1.1.libraries_of_models", "theophylline_project.mlxtran")
-  project <- get_project(project)
-  if (! .lixoftCall("getLaunchedTasks")[["populationParameterEstimation"]]) {
-    .lixoftCall("runPopulationParameterEstimation")
-  }
-  initRsSimulx(force = TRUE)
-  
   res0 <- simulx(project = project)
   res1 <- simulx(project = project, nrep = 1)
   res2 <- simulx(project = project, nrep = 5)
@@ -532,14 +463,6 @@ test_that("Output results contains the correct number of rep", {
 })
 
 test_that("When only one set of population parameters, a named vector is returned", {
-  project <- file.path(demo_path, "1.creating_and_using_models",
-                       "1.1.libraries_of_models", "theophylline_project.mlxtran")
-  project <- get_project(project)
-  if (! .lixoftCall("getLaunchedTasks")[["populationParameterEstimation"]]) {
-    .lixoftCall("runPopulationParameterEstimation")
-  }
-  initRsSimulx(force = TRUE)
-  
   res1 <- simulx(project = project, npop = 1)
   res2 <- simulx(project = project, npop = 5)
   res3 <- simulx(project = project, npop = 42)
@@ -656,14 +579,6 @@ y = {distribution = normal, prediction = f, sd = a}
 })
 
 # test_that("Output defined with time = 'none' are removed from the results", {
-#   project <- file.path(demo_path, "1.creating_and_using_models",
-#                        "1.1.libraries_of_models", "warfarinPKPD_project.mlxtran")
-#   project <- get_project(project)
-#   if (! .lixoftCall("getLaunchedTasks")[["populationParameterEstimation"]]) {
-#     .lixoftCall("runPopulationParameterEstimation")
-#   }
-#   initRsSimulx(force = TRUE)
-#   
 #   res1 <- simulx(project = project)
 #   res2 <- simulx(project = project, output = list(name="y2", time="none"))
 #   expect_true("y1" %in% names(res1))
@@ -671,35 +586,34 @@ y = {distribution = normal, prediction = f, sd = a}
 # })
 
 test_that("No error when cat cov defined as T / F", {
-  project <- file.path(demo_path, "1.creating_and_using_models",
+  project_cov <- file.path(demo_path, "1.creating_and_using_models",
                        "1.1.libraries_of_models", "theophylline_project.mlxtran")
-  project <- get_project(project)
+  project_cov <- get_project(project_cov)
   .lixoftCall("setCovariateModel", list(list(V=c(SEX=T))))
+  .lixoftCall("saveProject", list(project_cov))
   .lixoftCall("runPopulationParameterEstimation")
-  .lixoftCall("saveProject", list(project))
 
   initRsSimulx(force = TRUE)
   
-  expect_error(
-    res <- simulx(project = project,
+  expect_no_error(
+    res <- simulx(project = project_cov,
            treatment = list(amount=80, time=0),
            output = list(name="Cc",time=0),
-           parameter = data.frame(id=1:4, SEX=c("F"))),
-  NA)
+           covariate = data.frame(id=1:4, SEX="F", WEIGHT = 70)) )
   expect_equal(unique(res$parameter$SEX), "F")
 
   expect_error(
-    res <- simulx(project = project,
+    res <- simulx(project = project_cov,
            treatment = list(amount=80, time=0),
            output = list(name="Cc",time=0),
-           covariate = data.frame(id=1:4, SEX=c("F"))),
+           covariate = data.frame(id=1:4, SEX="F", WEIGHT = 70)),
     NA)
   expect_equal(unique(res$parameter$SEX), "F")
 })
 
 test_that("Model from library", {
   model <- "lib:oral1_1cpt_TlagkaVCl.txt"
-  expect_error(expect_warning(simulx(model)), NA)
+  expect_no_error(expect_warning(expect_warning(simulx(model))))
   
   model <- "lib:oral1_1cpt_Tlagka.txt"
   expect_error(expect_warning(simulx(model)), "is not a model from the libraries\n$")
@@ -895,16 +809,6 @@ output = Cc"
 })
 
 test_that("simulx save smlx project when saveSmlxProject is specified", {
-  project <- file.path(demo_path, "1.creating_and_using_models",
-                       "1.1.libraries_of_models", "theophylline_project.mlxtran")
-  project <- get_project(project)
-  if (! .lixoftCall("getLaunchedTasks")[["populationParameterEstimation"]]) {
-    # .lixoftCall("runPopulationParameterEstimation")
-    .lixoftCall("runScenario")
-    
-  } 
-  initRsSimulx(force = TRUE)
-  
   res <- simulx(project=project, saveSmlxProject=NULL)
   
   f1 <- paste0(tempfile(), ".smlx")
@@ -1132,31 +1036,35 @@ y = {distribution = normal, prediction = f, sd = a}
 })
 
 test_that("Occasion argument", {
+  warn_txt = "Column 'EVENT ID' added new occasions"
   iov_path <- file.path(demo_path, "5.models_for_individual_parameters/5.4.inter_occasion_variability")
-
   project1 <- file.path(iov_path, "iov2_project.mlxtran")
+  expect_warning(project1 <- get_project(project1),  warn_txt)
+  .lixoftCall("runPopulationParameterEstimation")
+  initRsSimulx(force = TRUE)
+  
   output <- list(name="Cc", time=seq(0, 200, 5))
   
-  res <- simulx(project=project1, output=output)
+  expect_warning(res <- simulx(project=project1, output=output), warn_txt)
   expect_true("OCCevid" %in% names(res$Cc))
   
-  res <- simulx(project=project1, output=output, occasion="none")
+  expect_warning(res <- simulx(project=project1, output=output, occasion="none"), warn_txt)
   expect_false("OCCevid" %in% names(res$Cc))
   
   occasion <- list(name='OCCASION', time=c(0, 120))
   output <- list(name="Cc", time=seq(0, 200, 5))
-  res <- simulx(project=project1, output=output, occasion=occasion)
+  expect_warning(res <- simulx(project=project1, output=output, occasion=occasion), warn_txt)
   expect_equal(unique(res$Cc[res$Cc$time < 120, "occ"]), 1)
   expect_equal(unique(res$Cc[res$Cc$time >= 120, "occ"]), 2)
   
   occasion <- data.frame(time=c(0, 120), OCCASION=c(1, 2))
-  res <- simulx(project=project1, output=output, occasion=occasion)
+  expect_warning(res <- simulx(project=project1, output=output, occasion=occasion), warn_txt)
   expect_equal(unique(res$Cc[res$Cc$time < 120, "occ"]), 1)
   expect_equal(unique(res$Cc[res$Cc$time >= 120, "occ"]), 2)
   
   occasion1 <- data.frame(id=c(1, 1, 2, 2, 3, 3), time=c(0, 120, 0, 100, 0, 130), OCCASION=c(1, 2, 1, 2, 1, 2))
   output <- list(name="Cc", time=seq(0, 200, 5))
-  res <- simulx(project=project1, output=output, occasion=occasion1)
+  expect_warning(res <- simulx(project=project1, output=output, occasion=occasion1), warn_txt)
   expect_equal(unique(res$Cc[res$Cc$id == 1 & res$Cc$time < 120, "OCCASION"]), 1)
   expect_equal(unique(res$Cc[res$Cc$id == 1 & res$Cc$time >= 120, "OCCASION"]), 2)
   expect_equal(unique(res$Cc[res$Cc$id == 2 & res$Cc$time < 100, "OCCASION"]), 1)
@@ -1166,7 +1074,7 @@ test_that("Occasion argument", {
   
   occasion2 <- data.frame(ID=c(1, 1, 2, 2, 3, 3), time=c(0, 120, 0, 100, 0, 130), OCCASION=c(1, 2, 1, 2, 1, 2))
   output <- list(name="Cc", time=seq(0, 200, 5))
-  res <- simulx(project=project1, output=output, occasion=occasion2)
+  expect_warning(res <- simulx(project=project1, output=output, occasion=occasion2), warn_txt)
   expect_equal(unique(res$Cc[res$Cc$id == 1 & res$Cc$time < 120, "OCCASION"]), 1)
   expect_equal(unique(res$Cc[res$Cc$id == 1 & res$Cc$time >= 120, "OCCASION"]), 2)
   expect_equal(unique(res$Cc[res$Cc$id == 2 & res$Cc$time < 100, "OCCASION"]), 1)
@@ -1176,7 +1084,7 @@ test_that("Occasion argument", {
   
   occasion1_file <- .addDataFrameTemp(occasion1)
   output <- list(name="Cc", time=seq(0, 200, 5))
-  res <- simulx(project=project1, output=output, occasion=occasion1_file)
+  expect_warning(res <- simulx(project=project1, output=output, occasion=occasion1_file), warn_txt)
   expect_equal(unique(res$Cc[res$Cc$id == 1 & res$Cc$time < 120, "OCCASION"]), 1)
   expect_equal(unique(res$Cc[res$Cc$id == 1 & res$Cc$time >= 120, "OCCASION"]), 2)
   expect_equal(unique(res$Cc[res$Cc$id == 2 & res$Cc$time < 100, "OCCASION"]), 1)
@@ -1186,7 +1094,7 @@ test_that("Occasion argument", {
   
   occasion2_file <- .addDataFrameTemp(occasion2)
   output <- list(name="Cc", time=seq(0, 200, 5))
-  res <- simulx(project=project1, output=output, occasion=occasion2_file)
+  expect_warning(res <- simulx(project=project1, output=output, occasion=occasion2_file), warn_txt)
   expect_equal(unique(res$Cc[res$Cc$id == 1 & res$Cc$time < 120, "OCCASION"]), 1)
   expect_equal(unique(res$Cc[res$Cc$id == 1 & res$Cc$time >= 120, "OCCASION"]), 2)
   expect_equal(unique(res$Cc[res$Cc$id == 2 & res$Cc$time < 100, "OCCASION"]), 1)
@@ -1197,13 +1105,16 @@ test_that("Occasion argument", {
 })
 
 test_that("Treatment and outputs elements when non overlapping occasions", {
+  warn_txt = "Column 'EVENT ID' added new occasions"
   iov_path <- file.path(demo_path, "5.models_for_individual_parameters/5.4.inter_occasion_variability")
+  project1 <- file.path(iov_path, "iov2_project.mlxtran")
+  expect_warning(project1 <- get_project(project1), warn_txt)
+  .lixoftCall("runPopulationParameterEstimation")
+  initRsSimulx(force = TRUE)
   
-  project <- file.path(iov_path, "iov2_project.mlxtran")
-
   # output
   output <- list(name="Cc", time=seq(0, 140, 5))
-  res <- simulx(project=project, output=output)
+  expect_warning(res <- simulx(project=project1, output=output), warn_txt)
   ids <- unique(.lixoftCall("getOccasionElements")$id)
   out_output <- data.frame(id=factor(rep(1:length(ids), each=29)),
                            OCCevid=sapply(output$time, function(t) ifelse(t < 120, 1, 2)),
@@ -1211,28 +1122,28 @@ test_that("Treatment and outputs elements when non overlapping occasions", {
   expect_equal(res$Cc[c("id", "OCCevid", "time")], out_output)
   
   output <- list(name="Cc", time=data.frame(id=rep(ids, each=29), time=rep(seq(0, 140, 5), length(ids))))
-  res <- simulx(project=project, output=output)
+  expect_warning(res <- simulx(project=project1, output=output), warn_txt)
   expect_equal(res$Cc[c("id", "OCCevid", "time")], out_output)
 
   output_file <- list(name="Cc", time=.addDataFrameTemp(output$time))
-  res <- simulx(project=project, output=output_file)
+  expect_warning(res <- simulx(project=project1, output=output_file), warn_txt)
   expect_equal(res$Cc[c("id", "OCCevid", "time")], out_output)
   
   output$time$OCCevid <- 1
   output$time$OCCevid[output$time$time >= 120] <- 2
-  res <- simulx(project=project, output=output)
+  expect_warning(res <- simulx(project=project1, output=output), warn_txt)
   expect_equal(res$Cc[c("id", "OCCevid", "time")], out_output)
   
   output_file <- list(name="Cc", time=.addDataFrameTemp(output$time))
-  res <- simulx(project=project, output=output_file)
+  expect_warning(res <- simulx(project=project1, output=output_file), warn_txt)
   expect_equal(res$Cc[c("id", "OCCevid", "time")], out_output)
   
   output$time <- .renameColumns(output$time, "OCCevid", "occevid")
-  res <- simulx(project=project, output=output)
+  expect_warning(res <- simulx(project=project1, output=output), warn_txt)
   expect_equal(res$Cc[c("id", "OCCevid", "time")], out_output)
   
   output_file <- list(name="Cc", time=.addDataFrameTemp(output$time))
-  res <- simulx(project=project, output=output_file)
+  expect_warning(res <- simulx(project=project1, output=output_file), warn_txt)
   expect_equal(res$Cc[c("id", "OCCevid", "time")], out_output)
 
   # treatment
@@ -1241,43 +1152,46 @@ test_that("Treatment and outputs elements when non overlapping occasions", {
                            OCCevid=sapply(treatment$time, function(t) ifelse(t < 120, 1, 2)),
                            time=treatment$time)
 
-  res <- simulx(project=project, treatment=treatment)
+  expect_warning(res <- simulx(project=project1, treatment=treatment), warn_txt)
   expect_equal(res$treatment[c("id", "OCCevid", "time")], trt_output)
   
   treatment <- data.frame(id=rep(ids, each=2), time=rep(c(0, 120), length(ids)), amount=200)
-  res <- simulx(project=project, treatment=treatment)
+  expect_warning(res <- simulx(project=project1, treatment=treatment), warn_txt)
   expect_equal(res$treatment[c("id", "OCCevid", "time")], trt_output)
   
   treatment_file <- .addDataFrameTemp(treatment)
-  res <- simulx(project=project, treatment=treatment_file)
+  expect_warning(res <- simulx(project=project1, treatment=treatment_file), warn_txt)
   expect_equal(res$treatment[c("id", "OCCevid", "time")], trt_output)
   
   treatment$OCCevid <- 1
   treatment$OCCevid[treatment$time >= 120] <- 2
-  res <- simulx(project=project, treatment=treatment)
+  expect_warning(res <- simulx(project=project1, treatment=treatment), warn_txt)
   expect_equal(res$treatment[c("id", "OCCevid", "time")], trt_output)
   
   treatment_file <- .addDataFrameTemp(treatment)
-  res <- simulx(project=project, treatment=treatment_file)
+  expect_warning(res <- simulx(project=project1, treatment=treatment_file), warn_txt)
   expect_equal(res$treatment[c("id", "OCCevid", "time")], trt_output)
   
   treatment <- .renameColumns(treatment, "OCCevid", "occevid")
-  res <- simulx(project=project, treatment=treatment)
+  expect_warning(res <- simulx(project=project1, treatment=treatment), warn_txt)
   expect_equal(res$treatment[c("id", "OCCevid", "time")], trt_output)
   
   treatment_file <- .addDataFrameTemp(treatment)
-  res <- simulx(project=project, treatment=treatment_file)
+  expect_warning(res <- simulx(project=project1, treatment=treatment_file), warn_txt)
   expect_equal(res$treatment[c("id", "OCCevid", "time")], trt_output)
 })
 
 test_that("Treatment and outputs elements when overlapping occasions", {
   iov_path <- file.path(demo_path, "5.models_for_individual_parameters/5.4.inter_occasion_variability")
   
-  project <- file.path(iov_path, "iov1_project.mlxtran")
+  project1 <- file.path(iov_path, "iov1_project.mlxtran")
+  project1 <- get_project(project1)
+  .lixoftCall("runPopulationParameterEstimation")
+  initRsSimulx(force = TRUE)
   
   # output
   output <- list(name="Cc", time=seq(0, 24, 2))
-  expect_warning(res <- simulx(project=project, output=output))
+  expect_warning(res <- simulx(project=project1, output=output))
   ids <- unique(.lixoftCall("getOccasionElements")$id)
   out_output <- data.frame(id=factor(rep(1:length(ids), each=26)),
                            OCC=rep(rep(c(1, 2), each=13), length(ids)),
@@ -1285,29 +1199,29 @@ test_that("Treatment and outputs elements when overlapping occasions", {
   expect_equal(res$Cc[c("id", "OCC", "time")], out_output)
   
   output <- list(name="Cc", time=data.frame(id=rep(ids, each=13), time=rep(seq(0, 24, 2), length(ids))))
-  expect_warning(res <- simulx(project=project, output=output))
+  expect_warning(res <- simulx(project=project1, output=output))
   expect_equal(res$Cc[c("id", "OCC", "time")], out_output)
   
   output_file <- list(name="Cc", time=.addDataFrameTemp(output$time))
-  expect_warning(res <- simulx(project=project, output=output_file))
+  expect_warning(res <- simulx(project=project1, output=output_file))
   expect_equal(res$Cc[c("id", "OCC", "time")], out_output)
   
   output$time <- as.data.frame(sapply(output$time, rep.int, times=2))
   output$time$time <- as.double(output$time$time)
   output$time$OCC <- rep(c(1, 2), each = 13 * length(ids))
-  res <- simulx(project=project, output=output)
+  res <- simulx(project=project1, output=output)
   expect_equal(res$Cc[c("id", "OCC", "time")], out_output)
   
   output_file <- list(name="Cc", time=.addDataFrameTemp(output$time))
-  res <- simulx(project=project, output=output_file)
+  res <- simulx(project=project1, output=output_file)
   expect_equal(res$Cc[c("id", "OCC", "time")], out_output)
   
   output$time <- .renameColumns(output$time, "OCC", "occ")
-  res <- simulx(project=project, output=output)
+  res <- simulx(project=project1, output=output)
   expect_equal(res$Cc[c("id", "OCC", "time")], out_output)
   
   output_file <- list(name="Cc", time=.addDataFrameTemp(output$time))
-  res <- simulx(project=project, output=output_file)
+  res <- simulx(project=project1, output=output_file)
   expect_equal(res$Cc[c("id", "OCC", "time")], out_output)
   
   # treatment
@@ -1316,34 +1230,34 @@ test_that("Treatment and outputs elements when overlapping occasions", {
                            OCC=rep(rep(c(1, 2), each=2), length(ids)),
                            time=rep(treatment$time, 2 * length(ids)))
   
-  expect_warning(res <- simulx(project=project, treatment=treatment))
+  expect_warning(res <- simulx(project=project1, treatment=treatment))
   expect_equal(res$treatment[c("id", "OCC", "time")], trt_output)
   
   treatment <- data.frame(id=rep(ids, each=2), time=rep(c(0, 120), length(ids)), amount=200)
-  expect_warning(res <- simulx(project=project, treatment=treatment))
+  expect_warning(res <- simulx(project=project1, treatment=treatment))
   expect_equal(res$treatment[c("id", "OCC", "time")], trt_output)
   
   treatment_file <- .addDataFrameTemp(treatment)
-  expect_warning(res <- simulx(project=project, treatment=treatment_file))
+  expect_warning(res <- simulx(project=project1, treatment=treatment_file))
   expect_equal(res$treatment[c("id", "OCC", "time")], trt_output)
   
   treatment <- as.data.frame(sapply(treatment, rep.int, times=2))
   treatment$time <- as.double(treatment$time)
   treatment$amount <- as.double(treatment$amount)
   treatment$OCC <- rep(c(1, 2), each = 2 * length(ids))
-  res <- simulx(project=project, treatment=treatment)
+  res <- simulx(project=project1, treatment=treatment)
   expect_equal(res$treatment[c("id", "OCC", "time")], trt_output)
   
   treatment_file <- .addDataFrameTemp(treatment)
-  res <- simulx(project=project, treatment=treatment_file)
+  res <- simulx(project=project1, treatment=treatment_file)
   expect_equal(res$treatment[c("id", "OCC", "time")], trt_output)
   
   treatment <- .renameColumns(treatment, "OCC", "occ")
-  res <- simulx(project=project, treatment=treatment)
+  res <- simulx(project=project1, treatment=treatment)
   expect_equal(res$treatment[c("id", "OCC", "time")], trt_output)
   
   treatment_file <- .addDataFrameTemp(treatment)
-  res <- simulx(project=project, treatment=treatment_file)
+  res <- simulx(project=project1, treatment=treatment_file)
   expect_equal(res$treatment[c("id", "OCC", "time")], trt_output)
 })
 
@@ -1368,30 +1282,30 @@ E = Emax*C/(C+EC50)"
     "regressor time vector and regressor value vector must have the same length.")
 
   reg <- list(name='C', time=t, value=exp(-0.1*t))
-  out_reg <- data.frame(id=rep(1:3, each=length(reg$time)), time=rep(reg$time, 3), C=rep(reg$value, 3))
+  out_reg <- data.frame(id=as.factor(rep(1:3, each=length(reg$time))), time=rep(reg$time, 3), C=rep(reg$value, 3))
   res <- simulx(model=model,
                 group=list(size=3),
                 parameter=c(Emax=100, EC50=0.3),
                 regressor=reg,
                 output=out)
-  expect_equal(.getRegressor()[c("id", "time", "C")], out_reg)
+  expect_equal(res$regressors, out_reg)
 
   reg <- rbind(
-    data.frame(id=rep(1:2, each=length(t)), time=rep(t, 2), C=rep(exp(-0.1*t), 2)),
-    data.frame(id=rep(3:4, each=length(t)), time=rep(t, 2), C=rep(exp(-0.4*t), 2))
+    data.frame(id=as.factor(rep(1:2, each=length(t))), time=rep(t, 2), C=rep(exp(-0.1*t), 2)),
+    data.frame(id=as.factor(rep(3:4, each=length(t))), time=rep(t, 2), C=rep(exp(-0.4*t), 2))
   )
   res <- simulx(model=model,
                 parameter=c(Emax=100, EC50=0.3),
                 regressor=reg,
                 output=out)
-  expect_equal(.getRegressor()[c("id", "time", "C")], reg)
+  expect_equal(res$regressors[-which(names(res$regressors) == "original_id")], reg)
   
   reg_file <- .addDataFrameTemp(reg)
   res <- simulx(model=model,
                 parameter=c(Emax=100, EC50=0.3),
                 regressor=reg_file,
                 output=out)
-  expect_equal(.getRegressor()[c("id", "time", "C")], reg)
+  expect_equal(res$regressors[-which(names(res$regressors) == "original_id")], reg)
   
   model <- inlineModel(
 "[LONGITUDINAL]
@@ -1415,27 +1329,30 @@ ddt_g =  k1*f - k2*g + x2"
   x2 <- list(name='x2',
              time=c(5,15,25,35),
              value=c(1,-1,1,-1)*0.3)
-  t <- sort(unique(c(x1$time, x2$time)))
-  out_reg <- data.frame(id=rep(1:3, each=length(t)), time=rep(t, 3))
+  t <- sort(unique(c(-5, x1$time, x2$time))) # include output time too
+  out_reg <- data.frame(id=as.factor(rep(1:3, each=length(t))), time=rep(t, 3))
   out_reg[out_reg$time %in% x1$time, "x1"] <- rep(x1$value, 3)
   out_reg[out_reg$time %in% x2$time, "x2"] <- rep(x2$value, 3)
-  out_reg[which(is.na(out_reg$x1)), "x1"] <- out_reg[which(is.na(out_reg$x1)) - 1, "x1"]
-  out_reg[out_reg$time == 0, "x2"] <- 0.3
-  out_reg[which(is.na(out_reg$x2)), "x2"] <- out_reg[which(is.na(out_reg$x2)) - 1, "x2"]
+  out_reg[out_reg$time == -5, c("x1", "x2")] <- rep(c(0.5, 0.3), each = 3)
+  i <- c(TRUE, !is.na(out_reg$x1[-1]))
+  out_reg$x1 <- out_reg$x1[i][cumsum(i)]
+  i <- c(TRUE, !is.na(out_reg$x2[-1]))
+  out_reg$x2 <- out_reg$x2[i][cumsum(i)]
+  
   res <- simulx(model=model,
                 group=list(size=3),
                 parameter=c(k1=0.2, k2=0.1, f0=0, g0=0),
                 regressor=list(x1, x2),
                 output=list(name=c('f','g'),time=seq(-5, 50, by=1)))
-  expect_equal(.getRegressor()[c("id", "time", "x1", "x2")], out_reg)
+  expect_equal(res$regressors, out_reg)
   
-  x1 <- data.frame(id=rep(1:3), time=rep(c(0,10,20,30,40), 3), x1=rep(c(1,-1,1,-1,1)*0.5, 3))
-  x2 <- data.frame(id=rep(1:3), time=rep(c(5,15,25,35), 3), x2=rep(c(1,-1,1,-1)*0.3, 3))
+  x1 <- data.frame(id=as.factor(rep(1:3)), time=rep(c(0,10,20,30,40), 3), x1=rep(c(1,-1,1,-1,1)*0.5, 3))
+  x2 <- data.frame(id=as.factor(rep(1:3)), time=rep(c(5,15,25,35), 3), x2=rep(c(1,-1,1,-1)*0.3, 3))
   res <- simulx(model=model,
                 parameter=c(k1=0.2, k2=0.1, f0=0, g0=0),
                 regressor=list(x1, x2),
                 output=list(name=c('f','g'),time=seq(-5, 50, by=1)))
-  expect_equal(.getRegressor()[c("id", "time", "x1", "x2")], out_reg)
+  expect_equal(res$regressors[-which(names(res$regressors) == "original_id")], out_reg)
   
   x1_file <- .addDataFrameTemp(x1)
   x2_file <- .addDataFrameTemp(x2)
@@ -1443,6 +1360,6 @@ ddt_g =  k1*f - k2*g + x2"
                 parameter=c(k1=0.2, k2=0.1, f0=0, g0=0),
                 regressor=list(x1_file, x2_file),
                 output=list(name=c('f','g'),time=seq(-5, 50, by=1)))
-  expect_equal(.getRegressor()[c("id", "time", "x1", "x2")], out_reg)
+  expect_equal(res$regressors[-which(names(res$regressors) == "original_id")], out_reg)
   
 })

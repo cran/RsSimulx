@@ -1,24 +1,25 @@
 Package: RsSimulx
 Type: Package
 Title: Extension of 'lixoftConnectors' for 'Simulx'
-Version: 2023.1
+Version: 2024.1
 Authors@R: 
     c(person(given = "Clemence",
              family = "Pinaud",
              role = "aut"),
       person(given = "Jonathan",
              family = "Chauvin",
-             role = "aut",
-             email = "jonathan.chauvin@lixoft.com"),
+             role = "aut"),
       person(given = "Marc",
              family = "Lavielle",
-             role = "ctb",
-             email = "Marc.Lavielle@inria.fr"),
+             role = "aut"),
       person(given = "Frano",
              family = "Mihaljevic",
-             role = c("aut", "cre"),
+             role = "aut"),
+      person(given = "Chloe",
+             family = "Bracis",
+             role = c("aut","cre"),
              email = "support@lixoft.com"))
-Maintainer: Frano Mihaljevic <support@lixoft.com>
+Maintainer: Chloe Bracis <support@lixoft.com>
 Description: Provides useful tools which supplement the use of 'Simulx' software and 'R' connectors ('Monolix Suite'). 'Simulx' is an easy, efficient and flexible application for clinical trial simulations. You need 'Simulx' software to be installed in order to use 'RsSimulx' package. Among others tasks, 'RsSimulx' provides the same functions as package 'mlxR' does with a compatibility with 'Simulx' software.
 SystemRequirements: 'Simulx' (<http://simulx.lixoft.com/>)
 Depends: R (>= 3.0.0), ggplot2
@@ -27,18 +28,20 @@ Encoding: UTF-8
 Collate: catplotmlx.R ggplotmlx.R kmplotmlx.R prctilemlx.R simulxR.R
         exposure.R shinymlx.R statmlx.R stoolsmlx.R simpop.R
         smlx-checks.R smlx-tools.R smlx-data.R smlx-project.R
-        writeData.R apiTools.R apiManager.R utils.R data.R zzz.R
+        apiTools.R apiManager.R utils.R data.R RsSimulx-deprecated.R
+        zzz.R
 LazyData: true
 License: BSD_2_clause + file LICENSE
 Copyright: LIXOFT
-RoxygenNote: 7.2.3
+RoxygenNote: 7.3.1
 Suggests: testthat (>= 3.0.0)
 Config/testthat/edition: 3
 NeedsCompilation: no
-Packaged: 2023-04-18 12:57:07 UTC; FranoMihaljevic
+Packaged: 2024-06-10 09:45:01 UTC; cbracis
 Author: Clemence Pinaud [aut],
   Jonathan Chauvin [aut],
-  Marc Lavielle [ctb],
-  Frano Mihaljevic [aut, cre]
+  Marc Lavielle [aut],
+  Frano Mihaljevic [aut],
+  Chloe Bracis [aut, cre]
 Repository: CRAN
-Date/Publication: 2023-04-20 10:00:02 UTC
+Date/Publication: 2024-06-10 12:30:07 UTC

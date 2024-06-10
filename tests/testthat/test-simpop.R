@@ -2,9 +2,13 @@ skip_on_cran()
 skip_if_not_installed("lixoftConnectors")
 
 initRsSimulx()
-demo_path <- file.path(path.expand("~"), "lixoft", "monolix",
-                       paste0("monolix", .lixoftCall("getLixoftConnectorsState")$version), "demos")
+demo_path <- gsub("simulx", "monolix", .lixoftCall("getDemoPath"), fixed = TRUE)
 skip_if(!dir.exists(demo_path), message = NULL)
+
+project <- file.path(demo_path, "1.creating_and_using_models",
+                     "1.1.libraries_of_models", "theophylline_project.mlxtran")
+project <- get_project(project, runStdErrorsIfNeed = TRUE)
+initRsSimulx(force = TRUE)
 
 # test_that("simpopmlx returns an error when parameter & project defined together") {
 #   expect_error()
@@ -13,8 +17,6 @@ skip_if(!dir.exists(demo_path), message = NULL)
 
 # Test that arguments are well checked -----------------------------------------
 test_that("simpopmlx returns an error when n/kw.max/seed is not an integer", {
-  project <- file.path(demo_path, "1.creating_and_using_models",
-                       "1.1.libraries_of_models", "theophylline_project.mlxtran")
   expect_error(simpopmlx(project = project, n = "toto"))
   expect_error(simpopmlx(project = project, n = -3))
   expect_error(simpopmlx(project = project, n = 1.2))
@@ -28,8 +30,6 @@ test_that("simpopmlx returns an error when n/kw.max/seed is not an integer", {
 })
 
 test_that("simpopmlx returns an error when fim parameter is different from sa / lin", {
-  project <- file.path(demo_path, "1.creating_and_using_models",
-                       "1.1.libraries_of_models", "theophylline_project.mlxtran")
   expect_error(simpopmlx(project = project, fim = "toto"))
   expect_error(simpopmlx(project = project, fim = -3))
   expect_error(simpopmlx(project = project, fim = 3))
@@ -84,24 +84,18 @@ test_that("simpopmlx returns an error when correlation matrix is not in -1 1", {
 })
 
 test_that("simpopmlx returns an error when invalid sep (not in '\t', ',', ';', ' ')", {
-  project <- file.path(demo_path, "1.creating_and_using_models",
-                       "1.1.libraries_of_models", "theophylline_project.mlxtran")
   expect_error(simpopmlx(project, outputFilename = "/tmp/output.csv", sep = "toto"))
   expect_error(simpopmlx(project, outputFilename = "/tmp/output.csv", sep = 1))
   expect_error(simpopmlx(project, outputFilename = "/tmp/output.csv", sep = ":"))
 })
 
 test_that("simpopmlx returns an error when outputFilename is specified with the wrong extension", {
-  project <- file.path(demo_path, "1.creating_and_using_models",
-                       "1.1.libraries_of_models", "theophylline_project.mlxtran")
   expect_error(simpopmlx(project=project, outputFilename = "/tmp/output.docx"))
   expect_error(simpopmlx(project=project, outputFilename = "/tmp/output.smlx"))
 })
 
 # Check outputs ----------------------------------------------------------------
 test_that("If only one pop, no column pop in output dataframe", {
-  project <- file.path(demo_path, "1.creating_and_using_models",
-                       "1.1.libraries_of_models", "theophylline_project.mlxtran")
   res <- simpopmlx(project=project, n = 1)
   expect_false("pop" %in% names(res))
   res <- simpopmlx(project=project, n = 50)
@@ -109,8 +103,6 @@ test_that("If only one pop, no column pop in output dataframe", {
 })
 
 test_that("If n pop, output is a dataframe with n rows and a column pop", {
-  project <- file.path(demo_path, "1.creating_and_using_models",
-                       "1.1.libraries_of_models", "theophylline_project.mlxtran")
   res <- simpopmlx(project=project, n = 2)
   expect_equal(nrow(res), 2)
   res <- simpopmlx(project=project, n = 1)
@@ -120,42 +112,34 @@ test_that("If n pop, output is a dataframe with n rows and a column pop", {
 })
 
 test_that("pop column is a factor", {
-  project <- file.path(demo_path, "1.creating_and_using_models",
-                       "1.1.libraries_of_models", "theophylline_project.mlxtran")
   res <- simpopmlx(project=project, n = 50)
   expect_true(is.factor(res$pop))
   
 })
 
 test_that("If outputFilename specified, results is saved in a file with correct sep", {
-  if (file.exists("/tmp/output.csv")) file.remove("/tmp/output.csv")
-  project <- file.path(demo_path, "1.creating_and_using_models",
-                       "1.1.libraries_of_models", "theophylline_project.mlxtran")
-  res <- simpopmlx(project=project, outputFilename = "/tmp/output.csv", sep = ";")
-  expect_true(file.exists("/tmp/output.csv"))
-  expect_true(.getDelimiter("/tmp/output.csv") == ";")
+  tmp_output <- file.path(tempdir(), "output.csv")
+  if (file.exists(tmp_output)) file.remove(tmp_output)
+  res <- simpopmlx(project=project, outputFilename = tmp_output, sep = ";")
+  expect_true(file.exists(tmp_output))
+  expect_true(.getDelimiter(tmp_output) == ";")
 })
 
 test_that("If outputFilename specified, results is saved in a file and file content is equal to output", {
-  if (file.exists("/tmp/output.csv")) file.remove("/tmp/output.csv")
-  project <- file.path(demo_path, "1.creating_and_using_models",
-                       "1.1.libraries_of_models", "theophylline_project.mlxtran")
-  res1 <- simpopmlx(project=project, outputFilename = "/tmp/output.csv", sep = ";")
-  res2 <- utils::read.csv("/tmp/output.csv", sep=";")
+  tmp_output <- file.path(tempdir(), "output.csv")
+  if (file.exists(tmp_output)) file.remove(tmp_output)
+  res1 <- simpopmlx(project=project, outputFilename = tmp_output, sep = ";")
+  res2 <- utils::read.csv(tmp_output, sep=";")
   expect_equal(res1, res2)
 })
 
 test_that("If no seed specified, 2 iterations of the function give different results", {
-  project <- file.path(demo_path, "1.creating_and_using_models",
-                       "1.1.libraries_of_models", "theophylline_project.mlxtran")
   res1 <- simpopmlx(project=project)
   res2 <- simpopmlx(project=project)
   expect_false(isTRUE(all.equal(res1, res2)))
 })
 
 test_that("If two seeds specified, 2 iterations of the function give different results", {
-  project <- file.path(demo_path, "1.creating_and_using_models",
-                       "1.1.libraries_of_models", "theophylline_project.mlxtran")
   res1 <- simpopmlx(project=project, seed = 123)
   res2 <- simpopmlx(project=project, seed = 1234)
   expect_false(isTRUE(all.equal(res1, res2)))
@@ -163,8 +147,6 @@ test_that("If two seeds specified, 2 iterations of the function give different r
 
 
 test_that("If one seed specified, 2 iterations of the function give the same results", {
-  project <- file.path(demo_path, "1.creating_and_using_models",
-                       "1.1.libraries_of_models", "theophylline_project.mlxtran")
   res1 <- simpopmlx(project=project, seed = 123)
   res2 <- simpopmlx(project=project, seed = 123)
   expect_equal(res1, res2)
@@ -172,8 +154,6 @@ test_that("If one seed specified, 2 iterations of the function give the same res
 
 
 test_that("n = 1", {
-  project <- file.path(demo_path, "1.creating_and_using_models",
-                       "1.1.libraries_of_models", "theophylline_project.mlxtran")
   expect_error(simpopmlx(project=project, n = 10), NA)
   expect_error(simpopmlx(project=project, n = 1), NA)
 })

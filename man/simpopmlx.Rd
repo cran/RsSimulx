@@ -21,7 +21,7 @@ simpopmlx(
 
 \item{project}{(\emph{string}) a Monolix project, assuming that the Fisher information Matrix was estimated by Monolix.}
 
-\item{fim}{the (\emph{string}) Fisher Information Matrix estimated by Monolix. fim={"sa", "lin"} (default="sa")}
+\item{fim}{the (\emph{string}) Fisher Information Matrix estimated by Monolix. fim = c("sa", "lin") (default="sa")}
 
 \item{parameter}{(\emph{data.frame}) a data frame with the following columns
 \itemize{

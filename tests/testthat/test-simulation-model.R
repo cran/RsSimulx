@@ -308,12 +308,14 @@ test_that("treatment input of simulx : repeat", {
                     type=rep(1:2, times=3),
                     probaMissDose=rep(0:1, times=3),
                     repeats=4)
-  expect_warning(
+  # warning appears twice
+  warn_txt = "^Some columns have been ignored in .* : 'repeats'\n$"
+  expect_warning( expect_warning(
     res <- simulx(model = model,
                   parameter = param,
                   output = out,
                   treatment = trt),
-    "^Some columns have been ignored in .* : 'repeats'\n$"
+    warn_txt), warn_txt
   )
 
   expect_error(

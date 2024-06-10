@@ -150,14 +150,14 @@ You only need to specify a formula. The additional lines will be added in a new 
 
 \item{settings}{a list of optional settings
 \itemize{
-\item \code{seed} : initialization of the random number generator (integer) (by default a random seed will be generated)
-\item \code{id.out}  : add (TRUE) / remove (FALSE) columns id and group when only one element (N = 1 or group = 1) (default=FALSE)
-\item \code{kw.max} : deprecated.
+\item \code{seed}: initialization of the random number generator (integer) (by default a random seed will be generated)
+\item \code{id.out}: add (TRUE) / remove (FALSE) columns id and group when only one element (N = 1 or group = 1) (default=FALSE)
+\item \code{kw.max}: deprecated.
 \item \code{replacement} : deprecated, use samplingMethod instead
 \item \code{samplingMethod}: str, Sampling method used for the simulation. One of "keepOrder", "withReplacement", "withoutReplacement"
 (default "keepOrder")
-\item \code{out.trt} : TRUE/FALSE (default = TRUE) output of simulx includes treatment
-\item \code{out.reg} : TRUE/FALSE (default = TRUE) output of simulx includes regressors
+\item \code{out.trt}: TRUE/FALSE (default = TRUE) output of simulx includes treatment
+\item \code{out.reg}: TRUE/FALSE (default = TRUE) output of simulx includes regressors
 \item \code{sharedIds}: Vector of Elements that share ids. Available types are "covariate", "output",
 "treatment", "regressor", "population", "individual" (default c())
 \item \code{sameIndividualsAmongGroups}: boolean, if True same individuals will be simulated among all groups
@@ -165,6 +165,7 @@ You only need to specify a formula. The additional lines will be added in a new 
 \item \code{exportData}: boolean, if True and if a path to save the smlx project (saveSmlxProject) is specified,
 export the simulated dataset (smlx project directory/Simulation/simulatedData.txt)
 (default False)
+\item \code{regressorInterpolationMethod}: interpolation method for missing regressors. One of "lastCarriedForward" (default), "linearInterpolation"
 }}
 }
 \value{

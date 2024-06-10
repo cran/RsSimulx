@@ -18,7 +18,7 @@ If RsSimulx library is not already loaded and no path is given, the directory wr
 \value{
 A list:
 \itemize{
-\item \code{software}: the software that is used (should be monolix with Rsmlx)
+\item \code{software}: the software that is used (should be simulx)
 \item \code{path}: the path to MonolixSuite
 \item \code{version}: the version of MonolixSuite that is used
 \item \code{status}: boolean equaling TRUE if the initialization has been successful.

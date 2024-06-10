@@ -5,7 +5,7 @@
 #' See http://simulx.webpopix.org/mlxr/simpopmlx/ for more details.
 #' @param n (\emph{integer}) the number of vectors of population parameters (default = 1), 
 #' @param project (\emph{string}) a Monolix project, assuming that the Fisher information Matrix was estimated by Monolix.
-#' @param fim the (\emph{string}) Fisher Information Matrix estimated by Monolix. fim={"sa", "lin"} (default="sa") 
+#' @param fim the (\emph{string}) Fisher Information Matrix estimated by Monolix. fim = c("sa", "lin") (default="sa") 
 #' @param parameter (\emph{data.frame}) a data frame with the following columns
 #' \itemize{
 #'   \item \code{pop.param} (no default) population parameters 

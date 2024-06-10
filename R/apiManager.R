@@ -26,7 +26,7 @@ remove(myOS)
 #' }
 #' @return A list:
 #' \itemize{
-#'   \item \code{software}: the software that is used (should be monolix with Rsmlx)
+#'   \item \code{software}: the software that is used (should be simulx)
 #'   \item \code{path}: the path to MonolixSuite
 #'   \item \code{version}: the version of MonolixSuite that is used
 #'   \item \code{status}: boolean equaling TRUE if the initialization has been successful.
@@ -37,25 +37,30 @@ remove(myOS)
 #' }
 #' @export
 initRsSimulx <- function(path = NULL, ...){
-  # check if RsSimulx needs to be (re-)initialized:
-  currentPath <- get("LIXOFT_DIRECTORY", envir = smlxEnvironment)
+  
+  # track status: NA = unknown/uninitialized, TRUE = success, FALSE = fail
+  status <- NA
+  lixoftConnectorsState <- list()
+  
+  .checkConnectorVersion()
   
   if (!is.null(path)) {
     path <- normalizePath(path, winslash = "/", mustWork = FALSE)
   }
+  
+  # check if RsSimulx needs to be (re-)initialized:
+  currentPath <- get("LIXOFT_DIRECTORY", envir = smlxEnvironment)
 
   if (currentPath != "" && !is.null(path) && path != currentPath) {
-    warning("RsSimulx package has already been initialized with \"", currentPath,
-            "\". R session must be restarted to use a different Lixoft installation directory.",
-            call. = F)
-    return(invisible(list(status=FALSE, path=path)))   
+    warning("The RsSimulx package has already been initialized with \"", currentPath,
+            "\". The R session must be restarted to use a different MonolixSuite installation directory.",
+            call. = FALSE)
+    status <- FALSE
   }
   
   if (isNamespaceLoaded("lixoftConnectors")){
     
-    lixoftConnectorsState <- NULL
     lixoftConnectorsState <- .lixoftCall("getLixoftConnectorsState", list(quietly = TRUE))
-    
     
     if (!is.null(lixoftConnectorsState)){
       
@@ -64,33 +69,34 @@ initRsSimulx <- function(path = NULL, ...){
         if (lixoftConnectorsState$software == "simulx"){ # => nothing to be done
           
           assign("LIXOFT_DIRECTORY", lixoftConnectorsState$path, envir = smlxEnvironment)
-          lixoftConnectorsState$status <- TRUE
-          return(lixoftConnectorsState)
-          
+          status <- TRUE
         }
-        path <- lixoftConnectorsState$path
-        message("lixoftConnectors package has already been initialized using the Lixoft installation directory \"",
-                lixoftConnectorsState$path, "\". This directory will be used to run \"simulx\".")
         
+        path <- lixoftConnectorsState$path
+
       } else if (lixoftConnectorsState$path != path){
-        warning("lixoftConnectors package has already been initialized using an other Lixoft installation directory (\"",
-                lixoftConnectorsState$path, "\"). R session must be restarted to use a different Lixoft installation directory.",
+        warning("The lixoftConnectors package has already been initialized using a different MonolixSuite installation directory (\"",
+                lixoftConnectorsState$path, "\"). The R session must be restarted to use a different MonolixSuite installation directory.",
                 call. = F)
-        return(invisible(list(status=FALSE)))
+        status <- FALSE
       }
-      
     }
-    
   }
 
-  .checkLixoftVersion(path)
-
-  # lixoft core library initialization:
-  lixoft.status <- .initLixoftConnectorsLibrary(path, ...)
-  lixoftConnectorsState <- NULL
-  lixoftConnectorsState <- .lixoftCall("getLixoftConnectorsState", list(quietly = TRUE))
-  lixoftConnectorsState$status <- lixoft.status
+  if (is.na(status)) {
+    # connectors need initialization:
+    status <- .initLixoftConnectorsLibrary(path, ...)
+    lixoftConnectorsState <- .lixoftCall("getLixoftConnectorsState", list(quietly = TRUE))
+  }
+  
+  if (status != FALSE)
+  {
+    .checkLixoftVersion(lixoftConnectorsState)
+  }
+  
   set_options(info=FALSE)
+  
+  lixoftConnectorsState$status = status
 
   return(lixoftConnectorsState) 
 }
@@ -98,7 +104,9 @@ initRsSimulx <- function(path = NULL, ...){
 .initLixoftConnectorsLibrary <- function(path, ...){
   if (is.null(path)) path <- ""
   status <- FALSE
-  status = .lixoftCall("initializeLixoftConnectors", list(software = "simulx", path = path, ...))
+  # suppress warning since will error later for version mismatch
+  status = .suppressWarnings(.lixoftCall("initializeLixoftConnectors", list(software = "simulx", path = path, ...)), 
+                             "The lixoftConnectors package is not the same version as the software")
   
   if (status) {
     assign("LIXOFT_DIRECTORY", path, envir = smlxEnvironment)
@@ -120,7 +128,7 @@ initRsSimulx <- function(path = NULL, ...){
     }
   }
   if (!file.exists(lixoftRootDirectory)){
-    stop("Lixoft softwares suite has probably not been installed. You can install it from http://download.lixoft.com",
+    stop("MonolixSuite does not appear to have been installed. You can install it from http://download.lixoft.com",
          call. = F)
   }
   
@@ -156,56 +164,47 @@ initRsSimulx <- function(path = NULL, ...){
   
 }
 
-.checkLixoftDirectory <- function(path){
+.checkLixoftVersion <- function(connectorState) {
+  if (is.null(connectorState)) stop("Problem initializing lixoftConnectors.")
   
-  res = list(status = FALSE, reliesOnLixoftConnectors = NULL)
+  ver_RsSimulx <- packageVersion("RsSimulx")
+  ver_lixoft <- connectorState$version
+  ver_lixoft_major <- as.numeric(sub("([0-9]+).*$", "\\1", ver_lixoft)) # extract numbers from beginning
   
-  if (path == "" || !file.exists(file.path(path, 'lib')))
-    return(res)
-  
-  
-  myOS = .getOS()
-  lixoftConnectorsLibPath <- file.path(path, 'lib', if (myOS == "Windows") 'lixoftConnectors.dll' else 'liblixoftConnectors.so')
-  
-  if (file.exists(lixoftConnectorsLibPath)){
-    
-    options(lixoft_lixoftConnectors_loadOptions = list(quietLoad = TRUE, initializePkg = FALSE))
-    
-    isLixoftConnectorsPkgAvailable <- FALSE
-    command <- 'requireNamespace("lixoftConnectors", quietly = TRUE)'
-    isLixoftConnectorsPkgAvailable <- eval.parent(parse(text = command))
-
-    if (!isLixoftConnectorsPkgAvailable) {
-      stop("RsSimulx depends on \"lixoftConnectors\" (@Lixoft) package. Please install it using the following command:\n",
-           "> install.packages(\"", file.path(path, "connectors", "lixoftConnectors.tar.gz"), "\", repos = NULL)",
-           call. = F)
-    } else {
-      res$status = TRUE
-    }
-    
-    res$reliesOnLixoftConnectors = TRUE
-    
-    options(lixoft_lixoftConnectors_loadOptions = NULL)
-    
-  }
-  return(invisible(res))
-  
-}
-
-.checkLixoftVersion <- function(path = NULL) {
-  # check lixoft version
-  if (is.null(path)) path <- .findLixoftDirectory()
-  # check that connectors are installed
-  .checkLixoftDirectory(path)
-  if (length(grep("MonolixSuite[0-9]*", path))) {
-    # check connectors version
-    version <- regmatches(path, regexpr("MonolixSuite[0-9]*", path))
-    version <- gsub("MonolixSuite", "", version)
-    if (length(version)) {
-      if (as.numeric(version) < 2020) {
-        stop("You need to upgrade lixoftConnectors package with a version >= 2020 to use RsSimulx.", call. = F)
-      }
-    }
+  if (ver_RsSimulx$major != ver_lixoft_major) {
+    stop(paste0("The major version number for MonolixSuite and the RsSimulx package must be the same:\nMonolixSuite version -> ",
+                ver_lixoft, "\nRsSimulx package version -> ", ver_RsSimulx), call. = FALSE)
   }
   return(invisible(TRUE))
 }
+
+.checkConnectorVersion <- function() {
+  tryCatch(ver_Connectors <- packageVersion("lixoftConnectors"),
+           error = function(e) stop("RsSimulx depends on \"lixoftConnectors\" (@Lixoft) package. Please install it using the following command:\n",
+                                    "> install.packages(\"", file.path(.findLixoftDirectory(), "connectors", "lixoftConnectors.tar.gz"), "\", repos = NULL)",
+                                    call. = FALSE)
+  )
+  ver_RsSimulx <- packageVersion("RsSimulx")
+  
+  if (ver_RsSimulx$major != ver_Connectors$major) {
+    stop(paste0("The major version number for the lixoftConnectors package and the RsSimulx package must be the same:\nlixoftConnectors package version -> ",
+                 ver_Connectors, "\nRsSimulx package version -> ", ver_RsSimulx), call. = FALSE)
+  }
+  return(invisible(TRUE))
+}
+
+# suppress specific warnings 
+# .expr expression to evaluate that may throw error
+# .text  a string to match the warning via regex 
+.suppressWarnings <- function(.expr, .text, ...) {
+  eval.parent(substitute(
+    withCallingHandlers( .expr, warning = function(w) {
+      cm <- conditionMessage(w)
+      cond <- grepl(.text, cm)
+      if (cond) {
+        invokeRestart("muffleWarning")
+      }
+    })
+  ))
+}
+

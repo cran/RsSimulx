@@ -125,14 +125,14 @@
 #' (by default smlx project is not saved)
 #' @param settings a list of optional settings
 #' \itemize{
-#'   \item \code{seed} : initialization of the random number generator (integer) (by default a random seed will be generated)
-#'   \item \code{id.out}  : add (TRUE) / remove (FALSE) columns id and group when only one element (N = 1 or group = 1) (default=FALSE)
-#'   \item \code{kw.max} : deprecated.
+#'   \item \code{seed}: initialization of the random number generator (integer) (by default a random seed will be generated)
+#'   \item \code{id.out}: add (TRUE) / remove (FALSE) columns id and group when only one element (N = 1 or group = 1) (default=FALSE)
+#'   \item \code{kw.max}: deprecated.
 #'   \item \code{replacement} : deprecated, use samplingMethod instead
 #'   \item \code{samplingMethod}: str, Sampling method used for the simulation. One of "keepOrder", "withReplacement", "withoutReplacement"
 #'   (default "keepOrder")
-#'   \item \code{out.trt} : TRUE/FALSE (default = TRUE) output of simulx includes treatment
-#'   \item \code{out.reg} : TRUE/FALSE (default = TRUE) output of simulx includes regressors
+#'   \item \code{out.trt}: TRUE/FALSE (default = TRUE) output of simulx includes treatment
+#'   \item \code{out.reg}: TRUE/FALSE (default = TRUE) output of simulx includes regressors
 #'   \item \code{sharedIds}: Vector of Elements that share ids. Available types are "covariate", "output",
 #'   "treatment", "regressor", "population", "individual" (default c())
 #'   \item \code{sameIndividualsAmongGroups}: boolean, if True same individuals will be simulated among all groups
@@ -140,6 +140,7 @@
 #'   \item \code{exportData}: boolean, if True and if a path to save the smlx project (saveSmlxProject) is specified,
 #'   export the simulated dataset (smlx project directory/Simulation/simulatedData.txt)
 #'   (default False)
+#'   \item \code{regressorInterpolationMethod}: interpolation method for missing regressors. One of "lastCarriedForward" (default), "linearInterpolation"
 #' }
 #'
 #' @return A list of data frames. Each data frame is an output of simulx
@@ -194,6 +195,7 @@
 #' @importFrom stats runif
 #' @importFrom utils read.table
 #' @importFrom gridExtra grid.arrange
+#' @importFrom utils packageVersion
 #' @export
 simulx <- function(model=NULL, parameter=NULL, covariate=NULL, output=NULL,
                    treatment=NULL, regressor=NULL, occasion=NULL, varlevel=NULL,
@@ -204,7 +206,7 @@ simulx <- function(model=NULL, parameter=NULL, covariate=NULL, output=NULL,
 
   # connectors
   if (!initRsSimulx()$status)
-    return()
+    stop("Problem initializing lixoft connectors.")
 
   # Deprecated Warnings --------------------------------------------------------
 
@@ -267,7 +269,7 @@ simulx <- function(model=NULL, parameter=NULL, covariate=NULL, output=NULL,
   .check_in_vector(
     names(settings), "settings",
     c("seed", "kw.max", "sep", "digits", "replacement", "samplingMethod", "out.trt",
-      "out.reg", "id.out", "sameIndividualsAmongGroups", "sharedIds", "exportData")
+      "out.reg", "id.out", "sameIndividualsAmongGroups", "sharedIds", "exportData", "regressorInterpolationMethod")
   )
   settings <- .initsimulxSettings(settings)
 
@@ -661,6 +663,11 @@ simulx <- function(model=NULL, parameter=NULL, covariate=NULL, output=NULL,
   for (index in seq_along(.lixoftCall("getGroups"))) {
     .lixoftCall("renameGroup", list(paste0('simulationGroup', index), paste0(index)))
   }
+  
+  # regressor settings
+  if (!is.null(settings$regressorInterpolationMethod)) {
+    .lixoftCall("setRegressorsSettings ", settings$regressorInterpolationMethod)
+  }
 
   #=============================================================================
   # Run the simulation
@@ -691,7 +698,8 @@ simulx <- function(model=NULL, parameter=NULL, covariate=NULL, output=NULL,
   }
 
   # Manage Parameters Output in results ----------------------------------------
-  paramOut <- .lixoftCall("getSimulationResults")$IndividualParameters
+  paramOut <- .lixoftCall("getSimulationResults")
+  paramOut <- if (packageVersion('lixoftConnectors') < '2024.1') { paramOut$IndividualParameters } else { paramOut$individualParameters }
   if (length(paramOut) == 1) {
     paramOut <- paramOut[[1]]
   } else {
@@ -793,16 +801,7 @@ simulx <- function(model=NULL, parameter=NULL, covariate=NULL, output=NULL,
     .lixoftCall("saveProject", list(saveSmlxProject))
   }
 
-  if (settings$exportData) {
-    version <- .lixoftCall("getLixoftConnectorsState")$version
-    # RETRO 2020
-    if (version == "2020R1") {
-      file <- file.path(.lixoftCall("getProjectSettings")$directory, "Simulation", "simulatedData.txt")
-      writeData(filename=file)
-    } else {
-      .lixoftCall("exportSimulatedData")
-    }
-  }
+  .lixoftCall("exportSimulatedData")
 
   return(simOut)
 }
@@ -839,6 +838,8 @@ simulx <- function(model=NULL, parameter=NULL, covariate=NULL, output=NULL,
   if (!is.element("sharedIds", names(settings))) settings[["sharedIds"]] <- c()
   if (!is.element("sameIndividualsAmongGroups", names(settings))) settings[["sameIndividualsAmongGroups"]] <- F
   if (!is.element("exportData", names(settings))) settings$exportData <- F
+  if (!is.element("regressorInterpolationMethod", names(settings))) settings$regressorInterpolationMethod <- NULL
+  
 
   .check_pos_integer(settings$seed, "setting seed")
   .check_pos_integer(settings$kw.max, "setting kw.max")
@@ -851,7 +852,8 @@ simulx <- function(model=NULL, parameter=NULL, covariate=NULL, output=NULL,
                    c("covariate", "output", "treatment", "regressor", "population", "individual"))
   .check_bool(settings$sameIndividualsAmongGroups, "setting sameIndividualsAmongGroups")
   .check_bool(settings$exportData, "setting exportData")
-
+  .check_in_vector(settings$regressorInterpolationMethod, "setting regressorInterpolationMethod", c("lastCarriedForward", "linearInterpolation"))
+  
   return(settings)
 }
 
